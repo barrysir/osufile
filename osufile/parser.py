@@ -1,6 +1,7 @@
 import collections
 import itertools
 from typing import TextIO
+from dataclasses import dataclass, astuple, fields
 
 # --- Util functions ---
 def spliton(it, pred, init=None):
@@ -15,12 +16,35 @@ def spliton(it, pred, init=None):
         next(j)
         yield (i,j)
 
+def typed(types, items):
+    'convert a tuple of items to certain types'
+    return [t(s) for t,s in zip(types, items)]
+
+def unzip(args):
+    'unzip lists -> unzip([(1,4), (2,5), (3,6)]) = [(1,2,3), (4,5,6)]'
+    return zip(*args)
+
+def unzipl(args):
+    'unzip, but returns a list instead of an iterator'
+    return list(unzip(args))
+
 # namedtuple to store a parsing/writing function if you wanna use it
 ParserPair = collections.namedtuple('ParserPair', ['parse', 'write'])
 
 # --- Data types ---
 class OsuFile(collections.OrderedDict):
     header: str
+
+@dataclass 
+class TimingPoint:
+    time: int
+    tick: float 
+    meter: int
+    sampleset: int 
+    sampleindex: int 
+    volume: int 
+    uninherited: bool
+    effects: int
 
 # --- Parser ---
 class Parser:
@@ -32,7 +56,18 @@ class Parser:
     write_float = str
 
     def __init__(self):
+        # lookup tables are created in the constructor rather than set as static variables
+        # to allow for inheritance (need a reference to 'self')
+
+        # base types used by lookup tables
+        cls = self.__class__
+        self.osu_int = osu_int = ParserPair(cls.parse_int, cls.write_int)
+        self.osu_float = osu_float = ParserPair(cls.parse_float, cls.write_float)
+        self.osu_bool = osu_bool = ParserPair(cls.parse_bool, cls.write_bool)
+
+        # create type lookup tables 
         self.METADATA_TYPES = self.create_metadata_lookup_table()
+        self.TIMINGPOINT_PARSE_TYPE,self.TIMINGPOINT_WRITE_TYPE = unzipl([osu_int, osu_float, osu_int, osu_int, osu_int, osu_int, osu_bool, osu_int])
 
     def parse(self, file: TextIO) -> OsuFile:
         """
@@ -60,9 +95,13 @@ class Parser:
 
         for section,lines in sections(file):
             if section in {'General', 'Editor', 'Metadata', 'Difficulty'}:
-                valid_metadata = filter(lambda kv: kv[0] is not None, (self.parse_metadata(section, line) for line in lines))
+                valid_metadata = filter(lambda kv: kv is not None, (self.parse_metadata(section, line) for line in lines))
                 osu[section] = {key:val for key,val in valid_metadata}
-            elif section in {'HitObjects', 'TimingPoints', 'Events'}:
+            elif section in {'TimingPoints'}:
+                tps = filter(lambda tp: tp is not None, map(self.parse_timingpoint, lines))
+                osu[section] = list(tps)
+            elif section in {'HitObjects', 'Events'}:
+                lines = scrub(lines)
                 osu[section] = [line.split(',') for line in lines]
             else:
                 osu.setdefault(section, list(lines))
@@ -76,10 +115,13 @@ class Parser:
             file.write('[{}]\n'.format(section))
 
             if section in {'General', 'Editor', 'Metadata', 'Difficulty'}:
-                for keyval in section.items():
+                for keyval in osu[section].items():
                     file.write('{}\n'.format(self.write_metadata(section, keyval)))
-            elif section in {'HitObjects', 'TimingPoints', 'Events'}:
-                for obj in section:
+            elif section in {'TimingPoints'}:
+                for tp in osu[section]:
+                    file.write('{}\n'.format(self.write_timingpoint(tp)))
+            elif section in {'HitObjects', 'Events'}:
+                for obj in osu[section]:
                     file.write(','.join(obj) + '\n')
             else:
                 for line in osu[section]:
@@ -89,7 +131,7 @@ class Parser:
     def parse_metadata(self, section: str, line: str) -> (str, any):
         key,hasSeparator,val = line.partition(':')
         if not hasSeparator:
-            return (None, None)
+            return None
         key = key.strip()
         val = self.lookup_metadata_parser(section, key).parse(val.strip())
         return (key,val)
@@ -100,23 +142,32 @@ class Parser:
         return '{}:{}'.format(key, val)
 
     def lookup_metadata_parser(self, section: str, key: str) -> ParserPair:
-        cls = self.__class__
         return self.METADATA_TYPES[section].get(key, ParserPair(str, str))
 
     # --- Hit objects ---
 
     # --- Timing points ---
     def parse_timingpoint(self, line):
-        pass
+        tokens = line.split(',')
+        # structured so that a timing point with invalid argument types will be ignored,
+        # but too few arguments will throw an exception
+        def construct_tp(time, tick, meter, sampleset, sampleindex=0, volume=100, uninherited=True, effects=0):
+            return TimingPoint(time, tick, meter, sampleset, sampleindex, volume, uninherited, effects)
+            
+        try:
+            args = typed(self.TIMINGPOINT_PARSE_TYPE, tokens)
+        except:
+            return None 
+        return construct_tp(*args)
 
-    def write_timingpoint(self, tp) -> str:
-        return ""
+    def write_timingpoint(self, tp):
+        return ','.join(typed(self.TIMINGPOINT_WRITE_TYPE, astuple(tp)))
 
-    @classmethod
-    def create_metadata_lookup_table(cls):
-        osu_int = ParserPair(cls.parse_int, cls.write_int)
-        osu_float = ParserPair(cls.parse_float, cls.write_float)
-        osu_bool = ParserPair(cls.parse_bool, cls.write_bool)
+    # --- other stuff ---
+    def create_metadata_lookup_table(self):
+        osu_int = self.osu_int
+        osu_float = self.osu_float
+        osu_bool = self.osu_bool
         return {
             'General': {
                 'AudioLeadIn': osu_int,
