@@ -37,6 +37,12 @@ __CWD__ = Path(__file__).parent.absolute()
 # ... except if the invalid input is the first object, then the file will load correctly (but osu will complain)
 # if any text is put after [HitObjects] (including spaces), the parser throws an error
 
+# hit samples
+# default is 0:0:0:0:
+# if hit sample is '', returns default
+# all arguments must be present
+# extra arguments are ignored
+
 # // comments...
 # are probably not an actual thing, but a side-effect of invalid inputs being ignored
 # are not parsed out of values       (AudioLeadIn: 0 //test, Title: PLANET // SHAPER)
@@ -285,7 +291,7 @@ class OsuFileTest(unittest.TestCase):
 
         [HitObjects]
         200,100,10000,1,0
-        200,100,20000,1,0,0,0:0:0:0:
+        200,100,20000,1,0,0:0:0:0:
         ''')
         self.roundtrip(sample)
     
@@ -301,7 +307,7 @@ class OsuFileTest(unittest.TestCase):
         ''')
         osu = self.parse_string(sample)
         EXPECTED = [
-            osufile.HitCircle(x=200, y=100, time=10000, type=1, sound=0, sample='0:0:0:0:')
+            osufile.HitCircle(x=200, y=100, time=10000, type=1, sound=0, sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))
         ]
         self.assertEqual(osu['HitObjects'], EXPECTED)
     
@@ -314,7 +320,7 @@ class OsuFileTest(unittest.TestCase):
         ''')
         osu = self.parse_string(sample)
         EXPECTED = [
-            osufile.HitCircle(x=200, y=100, time=10000, type=1, sound=0, sample='0:0:0:0:')
+            osufile.HitCircle(x=200, y=100, time=10000, type=1, sound=0, sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))
         ]
         self.assertEqual(osu['HitObjects'], EXPECTED)
 
@@ -327,6 +333,31 @@ class OsuFileTest(unittest.TestCase):
         ''')
         osu = self.parse_string(sample)
         EXPECTED = [
-            osufile.HitCircle(x=200, y=100, time=10000, type=1, sound=0, sample='0:0:0:0:')
+            osufile.HitCircle(x=200, y=100, time=10000, type=1, sound=0, sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))
         ]
         self.assertEqual(osu['HitObjects'], EXPECTED)
+
+#---------------------------------------------------------
+#   HitSample tests
+#---------------------------------------------------------
+    def test_hitsample(self):
+        sample = '1:2:3:4:hi.wav'
+        EXPECTED = osufile.HitSample(normal_set=1, addition_set=2, index=3, volume=4, filename='hi.wav')
+        actual = osufile.Parser().parse_hitsample(sample)
+        self.assertEqual(actual, EXPECTED)
+    
+    def test_hitsample_extra_arguments(self):
+        sample = '1:2:3:4:hi.wav:adsfasdf'
+        EXPECTED = osufile.HitSample(normal_set=1, addition_set=2, index=3, volume=4, filename='hi.wav')
+        actual = osufile.Parser().parse_hitsample(sample)
+        self.assertEqual(actual, EXPECTED)
+    
+    def test_hitsample_missing_arguments(self):
+        sample = '1:2:3'
+        with self.assertRaises(Exception):
+            osufile.Parser().parse_hitsample(sample)
+    
+    def test_hitsample_empty_string(self):
+        EXPECTED = osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename='')
+        actual = osufile.Parser().parse_hitsample('')
+        self.assertEqual(actual, EXPECTED)

@@ -29,6 +29,10 @@ def unzipl(args):
     'unzip, but returns a list instead of an iterator'
     return list(unzip(args))
 
+def astuple_nonrecursive(dc):
+    'dataclasses.astuple, but not recursive'
+    return tuple(getattr(dc, field.name) for field in fields(dc))
+
 # namedtuple to store a parsing/writing function if you wanna use it
 ParserPair = collections.namedtuple('ParserPair', ['parse', 'write'])
 
@@ -154,11 +158,16 @@ class Parser:
         osu_int = self.osu_int
         osu_float = self.osu_float
         osu_bool = self.osu_bool
+        osu_str = (str,str)
         hitsample = (self.parse_hitsample, self.write_hitsample)
         self.HITOBJECT_HEADER = unzipl([osu_int, osu_int, osu_int, osu_int, osu_int])
         self.HITCIRCLE_TYPES = unzipl([hitsample])
+        self.HITSAMPLE_TYPES = unzipl([osu_int, osu_int, osu_int, osu_int, osu_str])
         self.HEADER_SIZE = len(self.HITOBJECT_HEADER[0])
 
+    def default_hitsample(self):
+        return HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename='')
+    
     def parse_hitobject(self, line):
         tokens = line.split(',')
         raw_header, raw_others = tokens[:self.HEADER_SIZE], tokens[self.HEADER_SIZE:]
@@ -166,7 +175,7 @@ class Parser:
         hittype = header[3]
         if hittype & self.HITTYPE_CIRCLE:
             if len(raw_others) == 0:
-                hitsample = self.parse_hitsample('0:0:0:0:')
+                hitsample = self.default_hitsample()
             else:
                 (hitsample,) = typed(self.HITCIRCLE_TYPES[0], raw_others)
             return HitCircle(*header, hitsample)
@@ -174,7 +183,7 @@ class Parser:
             return RawHitObject(*header, raw_others)
 
     def write_hitobject(self, obj):
-        objdata = astuple(obj)
+        objdata = astuple_nonrecursive(obj)
         header, others = objdata[:self.HEADER_SIZE], objdata[self.HEADER_SIZE:]
         raw_header = typed(self.HITOBJECT_HEADER[1], header)
         if isinstance(obj, HitCircle):
@@ -186,10 +195,14 @@ class Parser:
         return ','.join([*raw_header, *raw_others])
 
     def parse_hitsample(self, string):
-        return string
+        string = string.strip()
+        if string == '':
+            return self.default_hitsample()
+        else:
+            return HitSample(*typed(self.HITSAMPLE_TYPES[0], string.split(":")))
     
     def write_hitsample(self, sample):
-        return sample
+        return ':'.join(typed(self.HITSAMPLE_TYPES[1], astuple_nonrecursive(sample)))
     
     # --- Timing points ---
     def init_timingpoint_lookup_tables(self):
@@ -212,7 +225,7 @@ class Parser:
         return construct_tp(*args)
 
     def write_timingpoint(self, tp):
-        return ','.join(typed(self.TIMINGPOINT_WRITE_TYPE, astuple(tp)))
+        return ','.join(typed(self.TIMINGPOINT_WRITE_TYPE, astuple_nonrecursive(tp)))
 
     # --- other stuff ---
     def init_metadata_lookup_table(self):

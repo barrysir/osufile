@@ -15,13 +15,13 @@ class TimingPoint:
     uninherited: bool
     effects: int
 
-# @dataclass 
-# class HitSample:
-#     normal_set: int
-#     addition_set: int
-#     index: int
-#     volume: int
-#     filename: str
+@dataclass 
+class HitSample:
+    normal_set: int
+    addition_set: int
+    index: int
+    volume: int
+    filename: str
 
 @dataclass
 class HitCircle:
@@ -30,7 +30,7 @@ class HitCircle:
     time: int
     type: int
     sound: int
-    sample: str # HitSample
+    sample: HitSample
 
 @dataclass
 class RawHitObject:
