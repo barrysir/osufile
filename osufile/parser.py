@@ -162,8 +162,10 @@ class Parser:
         hitsample = (self.parse_hitsample, self.write_hitsample)
         self.HITOBJECT_HEADER = unzipl([osu_int, osu_int, osu_int, osu_int, osu_int])
         self.HITCIRCLE_TYPES = unzipl([hitsample])
-        self.HITSAMPLE_TYPES = unzipl([osu_int, osu_int, osu_int, osu_int, osu_str])
+        self.SPINNER_TYPES = unzipl([osu_int, hitsample])
         self.HOLD_ENDTIME_TYPE = osu_int
+        
+        self.HITSAMPLE_TYPES = unzipl([osu_int, osu_int, osu_int, osu_int, osu_str])
         self.HEADER_SIZE = len(self.HITOBJECT_HEADER[0])
 
     def default_hitsample(self):
@@ -185,6 +187,9 @@ class Parser:
         elif hittype & self.HITTYPE_HOLD:
             endtime,hitsample = self.parse_hold_sample(raw_others[0])
             return Hold(*header, endtime, hitsample)
+        elif hittype & self.HITTYPE_SPINNER:
+            others = typed(self.SPINNER_TYPES[0], raw_others)
+            return Spinner(*header, *others)
         else:
             return RawHitObject(*header, raw_others)
 
@@ -197,6 +202,8 @@ class Parser:
         elif isinstance(obj, Hold):
             endtime,sample = others
             raw_others = [self.write_hold_sample(endtime, sample)]
+        elif isinstance(obj, Spinner):
+            raw_others = typed(self.SPINNER_TYPES[1], others)
         elif isinstance(obj, RawHitObject):
             raw_others = others
         # "header + others": can only concatenate list (not "tuple") to list

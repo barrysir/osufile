@@ -424,3 +424,70 @@ class OsuFileTest(unittest.TestCase):
             osufile.Hold(x=200, y=100, time=10000, type=128, sound=0, endtime=11000, sample=osufile.HitSample(normal_set=1, addition_set=2, index=3, volume=4, filename=''))
         ]
         self.assertEqual(osu['HitObjects'], EXPECTED)
+
+#---------------------------------------------------------
+#   Spinner tests
+#---------------------------------------------------------
+    def test_spinner(self):
+        sample = cleandoc('''
+        osu file format v14
+
+        [HitObjects]
+        256,192,5000,12,0,6000,0:0:0:0:
+        ''')
+        osu = self.parse_string(sample)
+        EXPECTED = [
+            osufile.Spinner(x=256, y=192, time=5000, type=12, sound=0, endtime=6000, sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))
+        ]
+        self.assertEqual(osu['HitObjects'], EXPECTED)
+    
+    def test_spinner_missing_arguments(self):
+        sample = cleandoc('''
+        osu file format v14
+
+        [HitObjects]
+        256,192,5000,12,0,6000
+        ''')
+        with self.assertRaises(Exception):
+            osu = self.parse_string(sample)
+
+        sample = cleandoc('''
+        osu file format v14
+
+        [HitObjects]
+        256,192,5000,12,0
+        ''')
+        with self.assertRaises(Exception):
+            osu = self.parse_string(sample)
+
+        sample = cleandoc('''
+        osu file format v14
+
+        [HitObjects]
+        256,192,5000,12,0,
+        ''')
+        with self.assertRaises(Exception):
+            osu = self.parse_string(sample)
+
+    def test_spinner_bad_arguments(self):
+        sample = cleandoc('''
+        osu file format v14
+
+        [HitObjects]
+        256,192,5000,12,asdf,0:0:0:0:
+        ''')
+        with self.assertRaises(Exception):
+            osu = self.parse_string(sample)
+    
+    def test_spinner_extra_arguments(self):
+        sample = cleandoc('''
+        osu file format v14
+
+        [HitObjects]
+        256,192,5000,12,0,6000,0:0:0:0:,14
+        ''')
+        osu = self.parse_string(sample)
+        EXPECTED = [
+            osufile.Spinner(x=256, y=192, time=5000, type=12, sound=0, endtime=6000, sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))
+        ]
+        self.assertEqual(osu['HitObjects'], EXPECTED)
