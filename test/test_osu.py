@@ -22,8 +22,20 @@ __CWD__ = Path(__file__).parent.absolute()
 #       volume: 100
 #       kiai: False
 #       uninherited: False
+# extra arguments?
+#       ignored
 # timing points out of order are sorted
 #       don't do it with this parser?
+
+# hit objects
+# lost arguments?
+#   hit objects with fewer arguments than the header (x,y,time,type,hitsound) crashes the parser
+# extra arguments?
+#   extra arguments are ignored
+# which bits take precedence in determining what kind of hit object it is?
+# invalid inputs cause parser to crash
+# ... except if the invalid input is the first object, then the file will load correctly (but osu will complain)
+# if any text is put after [HitObjects] (including spaces), the parser throws an error
 
 # // comments...
 # are probably not an actual thing, but a side-effect of invalid inputs being ignored
@@ -51,7 +63,10 @@ class OsuFileTest(unittest.TestCase):
 
     def parse_string(self, s):
         return osufile.parse(StringIO(s))
-    
+
+#---------------------------------------------------------
+#   Metadata tests
+#---------------------------------------------------------
     def test_metadata_empty_section(self):
         sample = cleandoc('''
         osu file format v14
@@ -114,6 +129,9 @@ class OsuFileTest(unittest.TestCase):
         osu = self.parse_string(sample)
         self.assertEqual(osu['General'], {'AudioFilename': 'audio2.mp3'})
 
+#---------------------------------------------------------
+#   TimingPoint tests
+#---------------------------------------------------------
     def test_timingpoint(self):
         sample = cleandoc('''
         osu file format v14
@@ -139,7 +157,7 @@ class OsuFileTest(unittest.TestCase):
         osu = self.parse_string(sample)
         self.assertEqual(osu['TimingPoints'], [])
 
-    def test_timingpoint_bad_input_ignored(self):
+    def test_timingpoint_bad_input(self):
         sample = cleandoc('''
         osu file format v14
 
@@ -174,7 +192,7 @@ class OsuFileTest(unittest.TestCase):
         ] * 5
         self.assertEqual(osu['TimingPoints'], EXPECTED)
     
-    def test_timingpoint_too_few_arguments_throws_error(self):
+    def test_timingpoint_too_few_arguments(self):
         sample = cleandoc('''
         osu file format v14
 
@@ -183,6 +201,19 @@ class OsuFileTest(unittest.TestCase):
         ''')
         with self.assertRaises(Exception):
             osu = self.parse_string(sample)
+    
+    def test_timingpoint_too_many_arguments(self):
+        sample = cleandoc('''
+        osu file format v14
+
+        [TimingPoints]
+        0,300,4,1,0,100,1,0,50
+        ''')
+        osu = self.parse_string(sample)
+        EXPECTED = [
+            osufile.TimingPoint(time=0, tick=300.0, meter=4, sampleset=1, sampleindex=0, volume=100, uninherited=True, effects=0)
+        ]
+        self.assertEqual(osu['TimingPoints'], EXPECTED)
         
     def test_timingpoint_out_of_order(self):
         # for now, don't bother sorting them
@@ -212,3 +243,90 @@ class OsuFileTest(unittest.TestCase):
         1000,-75,4,2,0,50,0,0
         ''')
         self.roundtrip(sample)
+    
+#---------------------------------------------------------
+#   HitObject tests
+#---------------------------------------------------------
+    def test_hitobject_not_enough_arguments(self):
+        sample = cleandoc('''
+        osu file format v14
+
+        [HitObjects]
+        200,100,10000,1
+        ''')
+        with self.assertRaises(Exception):
+            osu = self.parse_string(sample)
+    
+    def test_hitobject_invalid(self):
+        sample = cleandoc('''
+        osu file format v14
+
+        [HitObjects]
+        sdfdfg
+        200,100,10000,1,0,0:0:0:0:
+        ''')
+        with self.assertRaises(Exception):
+            osu = self.parse_string(sample)
+    
+    def test_hitobject_bad_input(self):
+        sample = cleandoc('''
+        osu file format v14
+
+        [HitObjects]
+        200,100,10000,1,0,0:0:0:0:
+        200,100,asdf,1,0,0:0:0:0:
+        ''')
+        with self.assertRaises(Exception):
+            osu = self.parse_string(sample)
+        
+    def test_hitobject_roundtrip(self):
+        sample = cleandoc('''
+        osu file format v14
+
+        [HitObjects]
+        200,100,10000,1,0
+        200,100,20000,1,0,0,0:0:0:0:
+        ''')
+        self.roundtrip(sample)
+    
+#---------------------------------------------------------
+#   HitCircle tests
+#---------------------------------------------------------
+    def test_hitcircle(self):
+        sample = cleandoc('''
+        osu file format v14
+
+        [HitObjects]
+        200,100,10000,1,0,0:0:0:0:
+        ''')
+        osu = self.parse_string(sample)
+        EXPECTED = [
+            osufile.HitCircle(x=200, y=100, time=10000, type=1, sound=0, sample='0:0:0:0:')
+        ]
+        self.assertEqual(osu['HitObjects'], EXPECTED)
+    
+    def test_hitcircle_extra_arguments(self):
+        sample = cleandoc('''
+        osu file format v14
+
+        [HitObjects]
+        200,100,10000,1,0,0:0:0:0:,4
+        ''')
+        osu = self.parse_string(sample)
+        EXPECTED = [
+            osufile.HitCircle(x=200, y=100, time=10000, type=1, sound=0, sample='0:0:0:0:')
+        ]
+        self.assertEqual(osu['HitObjects'], EXPECTED)
+
+    def test_hitcircle_missing_sample(self):
+        sample = cleandoc('''
+        osu file format v14
+
+        [HitObjects]
+        200,100,10000,1,0
+        ''')
+        osu = self.parse_string(sample)
+        EXPECTED = [
+            osufile.HitCircle(x=200, y=100, time=10000, type=1, sound=0, sample='0:0:0:0:')
+        ]
+        self.assertEqual(osu['HitObjects'], EXPECTED)

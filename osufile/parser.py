@@ -2,6 +2,7 @@ import collections
 import itertools
 from typing import TextIO
 from dataclasses import dataclass, astuple, fields
+from .datatypes import *
 
 # --- Util functions ---
 def spliton(it, pred, init=None):
@@ -31,23 +32,9 @@ def unzipl(args):
 # namedtuple to store a parsing/writing function if you wanna use it
 ParserPair = collections.namedtuple('ParserPair', ['parse', 'write'])
 
-# --- Data types ---
-class OsuFile(collections.OrderedDict):
-    header: str
-
-@dataclass 
-class TimingPoint:
-    time: int
-    tick: float 
-    meter: int
-    sampleset: int 
-    sampleindex: int 
-    volume: int 
-    uninherited: bool
-    effects: int
-
 # --- Parser ---
 class Parser:
+    # simple parsers
     parse_bool = lambda x: bool(int(x))
     write_bool = lambda x: str(int(x))
     parse_int = lambda x: int(round(float(x)))
@@ -66,8 +53,9 @@ class Parser:
         self.osu_bool = osu_bool = ParserPair(cls.parse_bool, cls.write_bool)
 
         # create type lookup tables 
-        self.METADATA_TYPES = self.create_metadata_lookup_table()
-        self.TIMINGPOINT_PARSE_TYPE,self.TIMINGPOINT_WRITE_TYPE = unzipl([osu_int, osu_float, osu_int, osu_int, osu_int, osu_int, osu_bool, osu_int])
+        self.METADATA_TYPES = self.init_metadata_lookup_table()
+        self.init_timingpoint_lookup_tables()
+        self.init_hitobject_lookup_tables()
 
     def parse(self, file: TextIO) -> OsuFile:
         """
@@ -100,6 +88,9 @@ class Parser:
             elif section in {'TimingPoints'}:
                 tps = filter(lambda tp: tp is not None, map(self.parse_timingpoint, lines))
                 osu[section] = list(tps)
+            elif section in {'HitObjects'}:
+                objs = filter(lambda i: i is not None, map(self.parse_hitobject, lines))
+                osu[section] = list(objs)
             elif section in {'HitObjects', 'Events'}:
                 lines = scrub(lines)
                 osu[section] = [line.split(',') for line in lines]
@@ -120,7 +111,10 @@ class Parser:
             elif section in {'TimingPoints'}:
                 for tp in osu[section]:
                     file.write('{}\n'.format(self.write_timingpoint(tp)))
-            elif section in {'HitObjects', 'Events'}:
+            elif section in {'HitObjects'}:
+                for obj in osu[section]:
+                    file.write('{}\n'.format(self.write_hitobject(obj)))
+            elif section in {'Events'}:
                 for obj in osu[section]:
                     file.write(','.join(obj) + '\n')
             else:
@@ -145,8 +139,65 @@ class Parser:
         return self.METADATA_TYPES[section].get(key, ParserPair(str, str))
 
     # --- Hit objects ---
+    HITTYPE_CIRCLE = 1 << 0
+    HITTYPE_SLIDER = 1 << 1
+    HITTYPE_SPINNER = 1 << 3
+    HITTYPE_HOLD = 1 << 7
+    HITTYPE_NEWCOMBO = 1 << 2
 
+    HITSOUND_NORMAL = 1 << 0
+    HITSOUND_WHISTLE = 1 << 1
+    HITSOUND_FINISH = 1 << 2
+    HITSOUND_CLAP = 1 << 3
+
+    def init_hitobject_lookup_tables(self):
+        osu_int = self.osu_int
+        osu_float = self.osu_float
+        osu_bool = self.osu_bool
+        hitsample = (self.parse_hitsample, self.write_hitsample)
+        self.HITOBJECT_HEADER = unzipl([osu_int, osu_int, osu_int, osu_int, osu_int])
+        self.HITCIRCLE_TYPES = unzipl([hitsample])
+        self.HEADER_SIZE = len(self.HITOBJECT_HEADER[0])
+
+    def parse_hitobject(self, line):
+        tokens = line.split(',')
+        raw_header, raw_others = tokens[:self.HEADER_SIZE], tokens[self.HEADER_SIZE:]
+        header = typed(self.HITOBJECT_HEADER[0], raw_header)
+        hittype = header[3]
+        if hittype & self.HITTYPE_CIRCLE:
+            if len(raw_others) == 0:
+                hitsample = self.parse_hitsample('0:0:0:0:')
+            else:
+                (hitsample,) = typed(self.HITCIRCLE_TYPES[0], raw_others)
+            return HitCircle(*header, hitsample)
+        else:
+            return RawHitObject(*header, raw_others)
+
+    def write_hitobject(self, obj):
+        objdata = astuple(obj)
+        header, others = objdata[:self.HEADER_SIZE], objdata[self.HEADER_SIZE:]
+        raw_header = typed(self.HITOBJECT_HEADER[1], header)
+        if isinstance(obj, HitCircle):
+            raw_others = typed(self.HITCIRCLE_TYPES[1], others)
+        elif isinstance(obj, RawHitObject):
+            raw_others = others
+        # "header + others": can only concatenate list (not "tuple") to list
+        # so we'll use this way of concatenating iterables
+        return ','.join([*raw_header, *raw_others])
+
+    def parse_hitsample(self, string):
+        return string
+    
+    def write_hitsample(self, sample):
+        return sample
+    
     # --- Timing points ---
+    def init_timingpoint_lookup_tables(self):
+        osu_int = self.osu_int
+        osu_float = self.osu_float
+        osu_bool = self.osu_bool
+        self.TIMINGPOINT_PARSE_TYPE,self.TIMINGPOINT_WRITE_TYPE = unzipl([osu_int, osu_float, osu_int, osu_int, osu_int, osu_int, osu_bool, osu_int])
+
     def parse_timingpoint(self, line):
         tokens = line.split(',')
         # structured so that a timing point with invalid argument types will be ignored,
@@ -157,14 +208,14 @@ class Parser:
         try:
             args = typed(self.TIMINGPOINT_PARSE_TYPE, tokens)
         except:
-            return None 
+            return None
         return construct_tp(*args)
 
     def write_timingpoint(self, tp):
         return ','.join(typed(self.TIMINGPOINT_WRITE_TYPE, astuple(tp)))
 
     # --- other stuff ---
-    def create_metadata_lookup_table(self):
+    def init_metadata_lookup_table(self):
         osu_int = self.osu_int
         osu_float = self.osu_float
         osu_bool = self.osu_bool

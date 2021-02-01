@@ -1,4 +1,5 @@
-from .parser import Parser, OsuFile, TimingPoint
+from .parser import Parser
+from .datatypes import *
 
 def parse(file_or_fileobj, parser=Parser()):
     if isinstance(file_or_fileobj, str):
