@@ -33,6 +33,16 @@ class HitCircle:
     sample: HitSample
 
 @dataclass
+class Hold:
+    x: int
+    y: int
+    time: int
+    type: int
+    sound: int
+    endtime: int
+    sample: HitSample
+
+@dataclass
 class RawHitObject:
     x: int
     y: int

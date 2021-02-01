@@ -43,6 +43,11 @@ __CWD__ = Path(__file__).parent.absolute()
 # all arguments must be present
 # extra arguments are ignored
 
+# osumania holds
+# argument is mandatory (it doesn't crash, but it causes the file to glitch out)
+# all parameters are mandatory
+# extra arguments are ignored
+
 # // comments...
 # are probably not an actual thing, but a side-effect of invalid inputs being ignored
 # are not parsed out of values       (AudioLeadIn: 0 //test, Title: PLANET // SHAPER)
@@ -292,6 +297,7 @@ class OsuFileTest(unittest.TestCase):
         [HitObjects]
         200,100,10000,1,0
         200,100,20000,1,0,0:0:0:0:
+        200,100,10000,128,0,11000:1:2:3:4:
         ''')
         self.roundtrip(sample)
     
@@ -337,6 +343,19 @@ class OsuFileTest(unittest.TestCase):
         ]
         self.assertEqual(osu['HitObjects'], EXPECTED)
 
+    def test_hitcircle_empty_sample(self):
+        sample = cleandoc('''
+        osu file format v14
+
+        [HitObjects]
+        200,100,10000,1,0,
+        ''')
+        osu = self.parse_string(sample)
+        EXPECTED = [
+            osufile.HitCircle(x=200, y=100, time=10000, type=1, sound=0, sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))
+        ]
+        self.assertEqual(osu['HitObjects'], EXPECTED)
+
 #---------------------------------------------------------
 #   HitSample tests
 #---------------------------------------------------------
@@ -356,8 +375,52 @@ class OsuFileTest(unittest.TestCase):
         sample = '1:2:3'
         with self.assertRaises(Exception):
             osufile.Parser().parse_hitsample(sample)
+
+#---------------------------------------------------------
+#   Hold note tests
+#---------------------------------------------------------
+    def test_holdnote(self):
+        sample = cleandoc('''
+        osu file format v14
+
+        [HitObjects]
+        200,100,10000,128,0,11000:1:2:3:4:
+        ''')
+        osu = self.parse_string(sample)
+        EXPECTED = [
+            osufile.Hold(x=200, y=100, time=10000, type=128, sound=0, endtime=11000, sample=osufile.HitSample(normal_set=1, addition_set=2, index=3, volume=4, filename=''))
+        ]
+        self.assertEqual(osu['HitObjects'], EXPECTED)
     
-    def test_hitsample_empty_string(self):
-        EXPECTED = osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename='')
-        actual = osufile.Parser().parse_hitsample('')
-        self.assertEqual(actual, EXPECTED)
+    def test_holdnote_missing_sample(self):
+        sample = cleandoc('''
+        osu file format v14
+
+        [HitObjects]
+        200,100,10000,128,0
+        ''')
+        with self.assertRaises(Exception):
+            osu = self.parse_string(sample)
+    
+    def test_holdnote_bad_arguments(self):
+        sample = cleandoc('''
+        osu file format v14
+
+        [HitObjects]
+        200,100,10000,128,0,asdf:1:2:3:4:
+        ''')
+        with self.assertRaises(Exception):
+            osu = self.parse_string(sample)
+    
+    def test_holdnote_extra_arguments(self):
+        sample = cleandoc('''
+        osu file format v14
+
+        [HitObjects]
+        200,100,10000,128,0,11000:1:2:3:4::hi
+        ''')
+        osu = self.parse_string(sample)
+        EXPECTED = [
+            osufile.Hold(x=200, y=100, time=10000, type=128, sound=0, endtime=11000, sample=osufile.HitSample(normal_set=1, addition_set=2, index=3, volume=4, filename=''))
+        ]
+        self.assertEqual(osu['HitObjects'], EXPECTED)

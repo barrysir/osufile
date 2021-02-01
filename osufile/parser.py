@@ -163,6 +163,7 @@ class Parser:
         self.HITOBJECT_HEADER = unzipl([osu_int, osu_int, osu_int, osu_int, osu_int])
         self.HITCIRCLE_TYPES = unzipl([hitsample])
         self.HITSAMPLE_TYPES = unzipl([osu_int, osu_int, osu_int, osu_int, osu_str])
+        self.HOLD_ENDTIME_TYPE = osu_int
         self.HEADER_SIZE = len(self.HITOBJECT_HEADER[0])
 
     def default_hitsample(self):
@@ -176,9 +177,14 @@ class Parser:
         if hittype & self.HITTYPE_CIRCLE:
             if len(raw_others) == 0:
                 hitsample = self.default_hitsample()
+            elif raw_others[0].strip() == '':
+                hitsample = self.default_hitsample()
             else:
                 (hitsample,) = typed(self.HITCIRCLE_TYPES[0], raw_others)
             return HitCircle(*header, hitsample)
+        elif hittype & self.HITTYPE_HOLD:
+            endtime,hitsample = self.parse_hold_sample(raw_others[0])
+            return Hold(*header, endtime, hitsample)
         else:
             return RawHitObject(*header, raw_others)
 
@@ -188,6 +194,9 @@ class Parser:
         raw_header = typed(self.HITOBJECT_HEADER[1], header)
         if isinstance(obj, HitCircle):
             raw_others = typed(self.HITCIRCLE_TYPES[1], others)
+        elif isinstance(obj, Hold):
+            endtime,sample = others
+            raw_others = [self.write_hold_sample(endtime, sample)]
         elif isinstance(obj, RawHitObject):
             raw_others = others
         # "header + others": can only concatenate list (not "tuple") to list
@@ -195,14 +204,19 @@ class Parser:
         return ','.join([*raw_header, *raw_others])
 
     def parse_hitsample(self, string):
-        string = string.strip()
-        if string == '':
-            return self.default_hitsample()
-        else:
-            return HitSample(*typed(self.HITSAMPLE_TYPES[0], string.split(":")))
-    
+        return HitSample(*typed(self.HITSAMPLE_TYPES[0], string.split(":")))
+
     def write_hitsample(self, sample):
         return ':'.join(typed(self.HITSAMPLE_TYPES[1], astuple_nonrecursive(sample)))
+    
+    def parse_hold_sample(self, string):
+        endtime,_,sample = string.partition(':')
+        return self.HOLD_ENDTIME_TYPE[0](endtime), self.parse_hitsample(sample)
+    
+    def write_hold_sample(self, endtime, sample):
+        endtime = self.HOLD_ENDTIME_TYPE[1](endtime)
+        sample = self.write_hitsample(sample)
+        return endtime + ':' + sample
     
     # --- Timing points ---
     def init_timingpoint_lookup_tables(self):
