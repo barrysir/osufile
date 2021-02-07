@@ -48,6 +48,23 @@ __CWD__ = Path(__file__).parent.absolute()
 # all parameters are mandatory
 # extra arguments are ignored
 
+# sliders
+# length is optional
+# edgesounds is optional    (default: probably 0?)
+#    extra pipes are ignored
+#    missing pipes are filled (filled with 0)
+#    invalid arguments are treated as 0
+# edgesets is optional      (default: probably 0?)
+#    extra pipes are ignored
+#    missing pipes are filled (filled with 0:0)
+#    extra colons are ignored
+#    missing colons throw an error
+#    invalid arguments throw an error
+# sample is optional        (default: 0:0:0:0:)
+#    extra colons are ignored
+# extra arguments are ignored
+# if edgesounds,edgesets,sample is all 0s, then the data is not saved by osu (to save space)
+
 # // comments...
 # are probably not an actual thing, but a side-effect of invalid inputs being ignored
 # are not parsed out of values       (AudioLeadIn: 0 //test, Title: PLANET // SHAPER)
@@ -491,3 +508,87 @@ class OsuFileTest(unittest.TestCase):
             osufile.Spinner(x=256, y=192, time=5000, type=12, sound=0, endtime=6000, sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))
         ]
         self.assertEqual(osu['HitObjects'], EXPECTED)
+
+#---------------------------------------------------------
+#   Slider tests
+#---------------------------------------------------------
+    def parse_hitobjects(self, hitobjs):
+        sample = '''
+osu file format v14
+
+[HitObjects]
+{}'''.format(hitobjs)
+        osu = self.parse_string(sample)
+        return osu['HitObjects']
+    
+    def parse_hitobject_fail(self, hitobjs):
+        with self.assertRaises(Exception):
+            self.parse_hitobjects(hitobjs)
+    
+    def test_slider(self):
+        self.assertEqual(
+            self.parse_hitobjects('442,316,10170,2,0,P|459:276|452:220,1,83.9999974365235,2|0,0:0|0:0,0:0:0:0:'),
+            [osufile.Slider(x=442, y=316, time=10170, type=2, sound=0, curveType='P', curvePoints=[(459, 276), (452, 220)], slides=1, length=83.9999974365235, edgeSounds=[2, 0], edgeSets=[(0, 0), (0, 0)], sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))]
+        )
+        self.assertEqual(
+            self.parse_hitobjects('56,7,11670,2,0,L|152:-2,1,83.9999974365235,0,0:0,0:0:0:0:'),
+            [osufile.Slider(x=56, y=7, time=11670, type=2, sound=0, curveType='L', curvePoints=[(152, -2)], slides=1, length=83.9999974365235, edgeSounds=[0], edgeSets=[(0, 0)], sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))]
+        )
+
+    def test_slider_optional_arguments(self):
+        sliders = [
+            '56,7,11670,2,0,L|152:-2,1,83.9999974365235,0,0:0,0:0:0:0:',
+            '56,7,11670,2,0,L|152:-2,1,83.9999974365235,0,0:0',
+            '56,7,11670,2,0,L|152:-2,1,83.9999974365235,0',
+            '56,7,11670,2,0,L|152:-2,1,83.9999974365235',
+            '56,7,11670,2,0,L|152:-2,1'
+        ]
+        EXPECTED = [
+            osufile.Slider(x=56, y=7, time=11670, type=2, sound=0, curveType='L', curvePoints=[(152, -2)], slides=1, length=83.9999974365235, edgeSounds=[0], edgeSets=[(0, 0)], sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))
+        for i in range(len(sliders))]
+
+        # the parser doesn't recalculate omitted lengths, it sets the lengths to 0,
+        # so for all sliders with omitted lengths we'll set the expected data to 0
+        for i in range(4, len(EXPECTED)):
+            EXPECTED[i].length = 0
+
+        for s,e in zip(sliders, EXPECTED):
+            self.assertEqual(self.parse_hitobjects(s), [e])
+        # self.assertEqual(self.parse_hitobjects('\n'.join(sliders)), EXPECTED)
+
+    def test_slider_too_few_arguments(self):
+        self.parse_hitobject_fail('56,7,11670,2,0,L|152:-2')
+
+    def test_slider_too_many_arguments(self):
+        self.assertEqual(
+            self.parse_hitobjects('56,7,11670,2,0,L|152:-2,1,83.9999974365235,0,0:0,0:0:0:0:,hi'),
+            [osufile.Slider(x=56, y=7, time=11670, type=2, sound=0, curveType='L', curvePoints=[(152, -2)], slides=1, length=83.9999974365235, edgeSounds=[0], edgeSets=[(0, 0)], sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))]
+        )
+    
+    def test_slider_edgesounds(self):
+        expected = [osufile.Slider(x=343, y=300, time=12570, type=2, sound=0, curveType='P', curvePoints=[(308, 266), (266, 254)], slides=1, length=83.9999974365235, edgeSounds=[2, 0], edgeSets=[(2, 2), (0, 0)], sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))]
+        check = lambda x: self.assertEqual(self.parse_hitobjects(x), expected)
+        
+        # extra pipes (ignored)
+        check('343,300,12570,2,0,P|308:266|266:254,1,83.9999974365235,2|0|5,2:2|0:0,0:0:0:0:')
+        # missing pipes (should be filled with 0)
+        check('343,300,12570,2,0,P|308:266|266:254,1,83.9999974365235,2,2:2|0:0,0:0:0:0:')
+        # invalid pipes (should be filled with 0)
+        check('343,300,12570,2,0,P|308:266|266:254,1,83.9999974365235,2|asdf,2:2|0:0,0:0:0:0:')
+    
+    def test_slider_edgesets(self):
+        expected = [osufile.Slider(x=343, y=300, time=12570, type=2, sound=0, curveType='P', curvePoints=[(308, 266), (266, 254)], slides=1, length=83.9999974365235, edgeSounds=[2, 0], edgeSets=[(2, 2), (0, 0)], sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))]
+        check = lambda x: self.assertEqual(self.parse_hitobjects(x), expected)
+
+        # extra pipes (ignored)
+        check('343,300,12570,2,0,P|308:266|266:254,1,83.9999974365235,2|0,2:2|0:0|3:4,0:0:0:0:')
+        # missing pipes (should be filled with (0,0))
+        check('343,300,12570,2,0,P|308:266|266:254,1,83.9999974365235,2|0,2:2,0:0:0:0:')
+        # invalid arguments in pipes (error)
+        self.parse_hitobject_fail('343,300,12570,2,0,P|308:266|266:254,1,83.9999974365235,2|0,2:2|ohno,0:0:0:0:')
+        # extra colons (ignored)
+        check('343,300,12570,2,0,P|308:266|266:254,1,83.9999974365235,2|0,2:2:4|0:0:1|3:4:0,0:0:0:0:')
+        # missing colons (error)
+        self.parse_hitobject_fail('343,300,12570,2,0,P|308:266|266:254,1,83.9999974365235,2|0,2|0,0:0:0:0:')
+        # invalid arguments in colons (error)
+        self.parse_hitobject_fail('343,300,12570,2,0,P|308:266|266:254,1,83.9999974365235,2|0,2:2|0:ohno,0:0:0:0:')

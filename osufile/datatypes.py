@@ -53,6 +53,21 @@ class Spinner:
     sample: HitSample
 
 @dataclass
+class Slider:
+    x: int
+    y: int
+    time: int
+    type: int
+    sound: int
+    curveType : str
+    curvePoints : list
+    slides : int
+    length : float
+    edgeSounds : list
+    edgeSets : list
+    sample: HitSample
+
+@dataclass
 class RawHitObject:
     x: int
     y: int

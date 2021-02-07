@@ -2,7 +2,9 @@ import collections
 import itertools
 from typing import TextIO
 from dataclasses import dataclass, astuple, fields
+from functools import reduce
 from .datatypes import *
+import warnings
 
 # --- Util functions ---
 def spliton(it, pred, init=None):
@@ -33,8 +35,65 @@ def astuple_nonrecursive(dc):
     'dataclasses.astuple, but not recursive'
     return tuple(getattr(dc, field.name) for field in fields(dc))
 
+def compose(*fns):
+    'compose(f,g,h,...) -> returns a function f(g(h(...))'
+    return reduce(lambda f, g: lambda *args: f(g(*args)), fns)
+
+# --- ParserPair ---
 # namedtuple to store a parsing/writing function if you wanna use it
 ParserPair = collections.namedtuple('ParserPair', ['parse', 'write'])
+
+def ptuple(parsers, optionals=[]):
+    parse_types,write_types = unzipl(parsers)
+    def parse(data):
+        if len(data) + len(optionals) < len(parse_types):
+            raise TypeError("parser requires at least {} arguments but only {} were given".format(
+                len(parse_types) - len(optionals),
+                len(data)
+            ))
+        parsed = list(typed(parse_types, data))
+        if len(parsed) < len(parse_types):
+            num_to_extend = len(parse_types) - len(parsed)
+            assert num_to_extend > 0
+            parsed.extend(optionals[-num_to_extend:])
+        return tuple(parsed)
+
+    def write(obj):
+        return typed(write_types, obj)
+    return ParserPair(parse, write)
+ 
+def plist(parser):
+    def parse(data):
+        return list(map(parser.parse, data))
+    def write(obj):
+        return list(map(parser.write, obj))
+    return ParserPair(parse, write)
+
+def psplit(sep):
+    def parse(data):
+        return data.split(sep)
+    def write(obj):
+        return sep.join(obj)
+    return ParserPair(parse, write)
+
+def ptry(parser, return_on_fail):
+    def parse(data):
+        try:
+            return parser.parse(data)
+        except:
+            return return_on_fail
+    return ParserPair(parse, parser.write)
+
+def pcompose(*parsers):
+    # parsing: parsers[0](parsers[1](...(data)))
+    # writing: writers[-1](writers[-2](...(obj)))
+    p,w = unzipl(parsers)
+    parse = compose(*p)
+    write = compose(*w[::-1])
+    return ParserPair(parse, write)
+
+plist_split = lambda sep, parser: pcompose(plist(parser), psplit(sep))
+ptuple_split = lambda sep, parsers: pcompose(ptuple(parsers), psplit(sep))
 
 # --- Parser ---
 class Parser:
@@ -95,7 +154,7 @@ class Parser:
             elif section in {'HitObjects'}:
                 objs = filter(lambda i: i is not None, map(self.parse_hitobject, lines))
                 osu[section] = list(objs)
-            elif section in {'HitObjects', 'Events'}:
+            elif section in {'Events'}:
                 lines = scrub(lines)
                 osu[section] = [line.split(',') for line in lines]
             else:
@@ -125,7 +184,9 @@ class Parser:
                 for line in osu[section]:
                     file.write(line + '\n')
     
-    # --- Metadata sections ---
+# ---------------------------------
+#   Metadata sections
+# ---------------------------------
     def parse_metadata(self, section: str, line: str) -> (str, any):
         key,hasSeparator,val = line.partition(':')
         if not hasSeparator:
@@ -142,7 +203,9 @@ class Parser:
     def lookup_metadata_parser(self, section: str, key: str) -> ParserPair:
         return self.METADATA_TYPES[section].get(key, ParserPair(str, str))
 
-    # --- Hit objects ---
+# ---------------------------------
+#   Hit objects
+# ---------------------------------
     HITTYPE_CIRCLE = 1 << 0
     HITTYPE_SLIDER = 1 << 1
     HITTYPE_SPINNER = 1 << 3
@@ -158,11 +221,32 @@ class Parser:
         osu_int = self.osu_int
         osu_float = self.osu_float
         osu_bool = self.osu_bool
-        osu_str = (str,str)
-        hitsample = (self.parse_hitsample, self.write_hitsample)
+        osu_str = ParserPair(str,str)
+        hitsample = ParserPair(self.parse_hitsample, self.write_hitsample)
+        def slider_curve():
+            ptparse = plist_split('|', ptuple_split(":", [osu_int, osu_int]))
+            def parse(obj):
+                # split the first item P|308:266|266:254|...
+                t,_,pts = obj.partition('|')
+                pts = ptparse.parse(pts)
+                return t,pts
+            def write(obj):
+                t,pts = obj
+                pts = ptparse.write(pts)
+                return t + '|' + pts
+            return ParserPair(parse, write)
+
         self.HITOBJECT_HEADER = unzipl([osu_int, osu_int, osu_int, osu_int, osu_int])
         self.HITCIRCLE_TYPES = unzipl([hitsample])
         self.SPINNER_TYPES = unzipl([osu_int, hitsample])
+        self.SLIDER_TYPES = ptuple([
+            slider_curve(),
+            osu_int,
+            osu_float, 
+            plist_split("|", ptry(osu_int, 0)),                      # edgeSounds
+            plist_split("|", ptuple_split(":", [osu_int, osu_int])),    # edgeSets
+            hitsample
+        ], optionals=[None, [], [], self.default_hitsample()])
         self.HOLD_ENDTIME_TYPE = osu_int
         
         self.HITSAMPLE_TYPES = unzipl([osu_int, osu_int, osu_int, osu_int, osu_str])
@@ -190,6 +274,9 @@ class Parser:
         elif hittype & self.HITTYPE_SPINNER:
             others = typed(self.SPINNER_TYPES[0], raw_others)
             return Spinner(*header, *others)
+        elif hittype & self.HITTYPE_SLIDER:
+            others = self.parse_slider_params(raw_others)
+            return Slider(*header, *others)
         else:
             return RawHitObject(*header, raw_others)
 
@@ -204,6 +291,8 @@ class Parser:
             raw_others = [self.write_hold_sample(endtime, sample)]
         elif isinstance(obj, Spinner):
             raw_others = typed(self.SPINNER_TYPES[1], others)
+        elif isinstance(obj, Slider):
+            raw_others = self.write_slider_params(others)
         elif isinstance(obj, RawHitObject):
             raw_others = others
         # "header + others": can only concatenate list (not "tuple") to list
@@ -225,7 +314,30 @@ class Parser:
         sample = self.write_hitsample(sample)
         return endtime + ':' + sample
     
-    # --- Timing points ---
+    def parse_slider_params(self, params):
+        def fillexact(arr, size, obj):
+            if len(arr) < size:
+                arr.extend([obj] * (size-len(arr)))
+            elif len(arr) > size:
+                del arr[size:]
+        
+        (curvetype,curvepoints),repeats,length,edgesounds,edgesets,sample = self.SLIDER_TYPES.parse(params)
+        
+        if length is None:
+            warnings.warn("Length is missing from slider data. Parser cannot calculate length, so it will set the length to 0.")
+            length = 0
+        fillexact(edgesounds, len(curvepoints), 0)
+        fillexact(edgesets, len(curvepoints), (0,0))
+        
+        return (curvetype,curvepoints,repeats,length,edgesounds,edgesets,sample)
+
+    def write_slider_params(self, slider):
+        params = [slider[0:2], *slider[2:]]
+        return self.SLIDER_TYPES.write(params)
+    
+# ---------------------------------
+#   Timing points
+# ---------------------------------
     def init_timingpoint_lookup_tables(self):
         osu_int = self.osu_int
         osu_float = self.osu_float
