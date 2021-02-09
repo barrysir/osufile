@@ -76,6 +76,7 @@ __CWD__ = Path(__file__).parent.absolute()
 
 class OsuFileTest(unittest.TestCase):
     def roundtrip(self, sample):
+        '''Run a roundtrip test on an .osu file (parse string -> write string -> parse string again -> check that first and second parse are the same)'''
         if isinstance(sample, osufile.OsuFile):
             expected_osu = sample
         elif isinstance(sample, str):
@@ -90,7 +91,36 @@ class OsuFileTest(unittest.TestCase):
         self.assertEqual(expected_osu, actual_osu)
 
     def parse_string(self, s):
+        '''Parse .osu file held as contents of string'''
         return osufile.parse(StringIO(s))
+    
+    def parse_hitobjects(self, hitobjs):
+        '''Parse some hitobjects'''
+        # create an osu file with only hitobjects and pass it into the parser
+        sample = (
+            'osu file format v14\n'
+            '\n'
+            '[HitObjects]\n'
+            f'{hitobjs}'
+        )
+        osu = self.parse_string(sample)
+        return osu['HitObjects']
+
+    def _test_hitobjects(self, hitobjs, expected):
+        self.assertEqual(self.parse_hitobjects(hitobjs), expected)
+    
+    def _test_hitobject_fail(self, hitobjs):
+        with self.assertRaises(Exception):
+            self.parse_hitobjects(hitobjs)
+        
+    def _test_hitobject_roundtrip(self, hitobjs):
+        sample = (
+            'osu file format v14\n'
+            '\n'
+            '[HitObjects]\n'
+            f'{hitobjs}'
+        )
+        self.roundtrip(sample)
 
 #---------------------------------------------------------
 #   Metadata tests
@@ -275,103 +305,53 @@ class OsuFileTest(unittest.TestCase):
 #---------------------------------------------------------
 #   HitObject tests
 #---------------------------------------------------------
-    def test_hitobject_not_enough_arguments(self):
-        sample = cleandoc('''
-        osu file format v14
-
-        [HitObjects]
-        200,100,10000,1
-        ''')
-        with self.assertRaises(Exception):
-            osu = self.parse_string(sample)
+    def test_hitobject_header_not_enough_arguments(self):
+        self._test_hitobject_fail('200,100,10000,1')
     
-    def test_hitobject_invalid(self):
-        sample = cleandoc('''
-        osu file format v14
-
-        [HitObjects]
-        sdfdfg
-        200,100,10000,1,0,0:0:0:0:
-        ''')
-        with self.assertRaises(Exception):
-            osu = self.parse_string(sample)
+    def test_hitobject_header_invalid(self):
+        self._test_hitobject_fail(cleandoc('''
+            sdfdfg
+            200,100,10000,1,0,0:0:0:0:
+        '''))
     
-    def test_hitobject_bad_input(self):
-        sample = cleandoc('''
-        osu file format v14
-
-        [HitObjects]
-        200,100,10000,1,0,0:0:0:0:
-        200,100,asdf,1,0,0:0:0:0:
-        ''')
-        with self.assertRaises(Exception):
-            osu = self.parse_string(sample)
-        
-    def test_hitobject_roundtrip(self):
-        sample = cleandoc('''
-        osu file format v14
-
-        [HitObjects]
-        200,100,10000,1,0
-        200,100,20000,1,0,0:0:0:0:
-        200,100,10000,128,0,11000:1:2:3:4:
-        ''')
-        self.roundtrip(sample)
+    def test_hitobject_header_bad_input(self):
+        self._test_hitobject_fail(cleandoc('''
+            200,100,10000,1,0,0:0:0:0:
+            200,100,asdf,1,0,0:0:0:0:
+        '''))
     
 #---------------------------------------------------------
 #   HitCircle tests
 #---------------------------------------------------------
     def test_hitcircle(self):
-        sample = cleandoc('''
-        osu file format v14
-
-        [HitObjects]
-        200,100,10000,1,0,0:0:0:0:
-        ''')
-        osu = self.parse_string(sample)
-        EXPECTED = [
-            osufile.HitCircle(x=200, y=100, time=10000, type=1, sound=0, sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))
-        ]
-        self.assertEqual(osu['HitObjects'], EXPECTED)
+        self._test_hitobjects(
+            '200,100,10000,1,0,0:0:0:0:',
+            [osufile.HitCircle(x=200, y=100, time=10000, type=1, sound=0, sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))]
+        )
     
     def test_hitcircle_extra_arguments(self):
-        sample = cleandoc('''
-        osu file format v14
-
-        [HitObjects]
-        200,100,10000,1,0,0:0:0:0:,4
-        ''')
-        osu = self.parse_string(sample)
-        EXPECTED = [
-            osufile.HitCircle(x=200, y=100, time=10000, type=1, sound=0, sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))
-        ]
-        self.assertEqual(osu['HitObjects'], EXPECTED)
+        self._test_hitobjects(
+            '200,100,10000,1,0,0:0:0:0:,asdfasdf',
+            [osufile.HitCircle(x=200, y=100, time=10000, type=1, sound=0, sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))]
+        )
 
     def test_hitcircle_missing_sample(self):
-        sample = cleandoc('''
-        osu file format v14
-
-        [HitObjects]
-        200,100,10000,1,0
-        ''')
-        osu = self.parse_string(sample)
-        EXPECTED = [
-            osufile.HitCircle(x=200, y=100, time=10000, type=1, sound=0, sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))
-        ]
-        self.assertEqual(osu['HitObjects'], EXPECTED)
+        self._test_hitobjects(
+            '200,100,10000,1,0',
+            [osufile.HitCircle(x=200, y=100, time=10000, type=1, sound=0, sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))]
+        )
 
     def test_hitcircle_empty_sample(self):
-        sample = cleandoc('''
-        osu file format v14
-
-        [HitObjects]
-        200,100,10000,1,0,
-        ''')
-        osu = self.parse_string(sample)
-        EXPECTED = [
-            osufile.HitCircle(x=200, y=100, time=10000, type=1, sound=0, sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))
-        ]
-        self.assertEqual(osu['HitObjects'], EXPECTED)
+        self._test_hitobjects(
+            '200,100,10000,1,0,',
+            [osufile.HitCircle(x=200, y=100, time=10000, type=1, sound=0, sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))]
+        )
+        
+    def test_hitcircle_roundtrip(self):
+        self._test_hitobject_roundtrip(cleandoc('''
+            200,100,10000,1,0
+            200,100,20000,1,0,0:0:0:0:
+        '''))
 
 #---------------------------------------------------------
 #   HitSample tests
@@ -397,141 +377,67 @@ class OsuFileTest(unittest.TestCase):
 #   Hold note tests
 #---------------------------------------------------------
     def test_holdnote(self):
-        sample = cleandoc('''
-        osu file format v14
-
-        [HitObjects]
-        200,100,10000,128,0,11000:1:2:3:4:
-        ''')
-        osu = self.parse_string(sample)
-        EXPECTED = [
-            osufile.Hold(x=200, y=100, time=10000, type=128, sound=0, endtime=11000, sample=osufile.HitSample(normal_set=1, addition_set=2, index=3, volume=4, filename=''))
-        ]
-        self.assertEqual(osu['HitObjects'], EXPECTED)
+        self._test_hitobjects(
+            '200,100,10000,128,0,11000:1:2:3:4:',
+            [osufile.Hold(x=200, y=100, time=10000, type=128, sound=0, endtime=11000, sample=osufile.HitSample(normal_set=1, addition_set=2, index=3, volume=4, filename=''))]
+        )
     
     def test_holdnote_missing_sample(self):
-        sample = cleandoc('''
-        osu file format v14
-
-        [HitObjects]
-        200,100,10000,128,0
-        ''')
-        with self.assertRaises(Exception):
-            osu = self.parse_string(sample)
+        self._test_hitobject_fail('200,100,10000,128,0')
     
     def test_holdnote_bad_arguments(self):
-        sample = cleandoc('''
-        osu file format v14
-
-        [HitObjects]
-        200,100,10000,128,0,asdf:1:2:3:4:
-        ''')
-        with self.assertRaises(Exception):
-            osu = self.parse_string(sample)
+        self._test_hitobject_fail('200,100,10000,128,0,asdf:1:2:3:4:')
     
     def test_holdnote_extra_arguments(self):
-        sample = cleandoc('''
-        osu file format v14
+        self._test_hitobjects(
+            '200,100,10000,128,0,11000:1:2:3:4::hi',
+            [osufile.Hold(x=200, y=100, time=10000, type=128, sound=0, endtime=11000, sample=osufile.HitSample(normal_set=1, addition_set=2, index=3, volume=4, filename=''))]
+        )
 
-        [HitObjects]
-        200,100,10000,128,0,11000:1:2:3:4::hi
-        ''')
-        osu = self.parse_string(sample)
-        EXPECTED = [
-            osufile.Hold(x=200, y=100, time=10000, type=128, sound=0, endtime=11000, sample=osufile.HitSample(normal_set=1, addition_set=2, index=3, volume=4, filename=''))
-        ]
-        self.assertEqual(osu['HitObjects'], EXPECTED)
+    def test_holdnote_roundtrip(self):
+        self._test_hitobject_roundtrip(cleandoc('''
+            200,100,10000,128,0,11000:1:2:3:4:
+        '''))
 
 #---------------------------------------------------------
 #   Spinner tests
 #---------------------------------------------------------
     def test_spinner(self):
-        sample = cleandoc('''
-        osu file format v14
-
-        [HitObjects]
-        256,192,5000,12,0,6000,0:0:0:0:
-        ''')
-        osu = self.parse_string(sample)
-        EXPECTED = [
-            osufile.Spinner(x=256, y=192, time=5000, type=12, sound=0, endtime=6000, sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))
-        ]
-        self.assertEqual(osu['HitObjects'], EXPECTED)
+        self._test_hitobjects(
+            '256,192,5000,12,0,6000,0:0:0:0:',
+            [osufile.Spinner(x=256, y=192, time=5000, type=12, sound=0, endtime=6000, sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))]
+        )
     
     def test_spinner_missing_arguments(self):
-        sample = cleandoc('''
-        osu file format v14
-
-        [HitObjects]
-        256,192,5000,12,0,6000
-        ''')
-        with self.assertRaises(Exception):
-            osu = self.parse_string(sample)
-
-        sample = cleandoc('''
-        osu file format v14
-
-        [HitObjects]
-        256,192,5000,12,0
-        ''')
-        with self.assertRaises(Exception):
-            osu = self.parse_string(sample)
-
-        sample = cleandoc('''
-        osu file format v14
-
-        [HitObjects]
-        256,192,5000,12,0,
-        ''')
-        with self.assertRaises(Exception):
-            osu = self.parse_string(sample)
+        self._test_hitobject_fail('256,192,5000,12,0,6000')     # missing hit sample
+        self._test_hitobject_fail('256,192,5000,12,0')          # missing endtime
+        self._test_hitobject_fail('256,192,5000,12,0,')         # empty endtime
+        self._test_hitobject_fail('256,192,5000,12,0,6000,')    # empty hit sample
 
     def test_spinner_bad_arguments(self):
-        sample = cleandoc('''
-        osu file format v14
-
-        [HitObjects]
-        256,192,5000,12,asdf,0:0:0:0:
-        ''')
-        with self.assertRaises(Exception):
-            osu = self.parse_string(sample)
+        self._test_hitobject_fail('256,192,5000,12,asdf,0:0:0:0:')
     
     def test_spinner_extra_arguments(self):
-        sample = cleandoc('''
-        osu file format v14
-
-        [HitObjects]
-        256,192,5000,12,0,6000,0:0:0:0:,14
-        ''')
-        osu = self.parse_string(sample)
-        EXPECTED = [
-            osufile.Spinner(x=256, y=192, time=5000, type=12, sound=0, endtime=6000, sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))
-        ]
-        self.assertEqual(osu['HitObjects'], EXPECTED)
+        self._test_hitobjects(
+            '256,192,5000,12,0,6000,0:0:0:0:,14',
+            [osufile.Spinner(x=256, y=192, time=5000, type=12, sound=0, endtime=6000, sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))]
+        )
+    
+    def test_spinner_roundtrip(self):
+        self._test_hitobject_roundtrip(cleandoc('''
+            256,192,5000,12,0,6000,0:0:0:0:
+        ''')) 
 
 #---------------------------------------------------------
 #   Slider tests
-#---------------------------------------------------------
-    def parse_hitobjects(self, hitobjs):
-        sample = '''
-osu file format v14
-
-[HitObjects]
-{}'''.format(hitobjs)
-        osu = self.parse_string(sample)
-        return osu['HitObjects']
-    
-    def parse_hitobject_fail(self, hitobjs):
-        with self.assertRaises(Exception):
-            self.parse_hitobjects(hitobjs)
-    
+#---------------------------------------------------------    
     def test_slider(self):
-        self.assertEqual(
-            self.parse_hitobjects('442,316,10170,2,0,P|459:276|452:220,1,83.9999974365235,2|0,0:0|0:0,0:0:0:0:'),
+        self._test_hitobjects(
+            '442,316,10170,2,0,P|459:276|452:220,1,83.9999974365235,2|0,0:0|0:0,0:0:0:0:',
             [osufile.Slider(x=442, y=316, time=10170, type=2, sound=0, curvetype='P', curvepoints=[(459, 276), (452, 220)], slides=1, length=83.9999974365235, edgesounds=[2, 0], edgesets=[(0, 0), (0, 0)], sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))]
         )
-        self.assertEqual(
-            self.parse_hitobjects('56,7,11670,2,0,L|152:-2,1,83.9999974365235,0,0:0,0:0:0:0:'),
+        self._test_hitobjects(
+            '56,7,11670,2,0,L|152:-2,1,83.9999974365235,0,0:0,0:0:0:0:',
             [osufile.Slider(x=56, y=7, time=11670, type=2, sound=0, curvetype='L', curvepoints=[(152, -2)], slides=1, length=83.9999974365235, edgesounds=[0], edgesets=[(0, 0)], sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))]
         )
 
@@ -553,21 +459,21 @@ osu file format v14
             EXPECTED[i].length = 0
 
         for s,e in zip(sliders, EXPECTED):
-            self.assertEqual(self.parse_hitobjects(s), [e])
+            self._test_hitobjects(s, [e])
         # self.assertEqual(self.parse_hitobjects('\n'.join(sliders)), EXPECTED)
 
     def test_slider_too_few_arguments(self):
-        self.parse_hitobject_fail('56,7,11670,2,0,L|152:-2')
+        self._test_hitobject_fail('56,7,11670,2,0,L|152:-2')
 
     def test_slider_too_many_arguments(self):
-        self.assertEqual(
-            self.parse_hitobjects('56,7,11670,2,0,L|152:-2,1,83.9999974365235,0,0:0,0:0:0:0:,hi'),
+        self._test_hitobjects(
+            '56,7,11670,2,0,L|152:-2,1,83.9999974365235,0,0:0,0:0:0:0:,hi',
             [osufile.Slider(x=56, y=7, time=11670, type=2, sound=0, curvetype='L', curvepoints=[(152, -2)], slides=1, length=83.9999974365235, edgesounds=[0], edgesets=[(0, 0)], sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))]
         )
     
     def test_slider_edgesounds(self):
         expected = [osufile.Slider(x=343, y=300, time=12570, type=2, sound=0, curvetype='P', curvepoints=[(308, 266), (266, 254)], slides=1, length=83.9999974365235, edgesounds=[2, 0], edgesets=[(2, 2), (0, 0)], sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))]
-        check = lambda x: self.assertEqual(self.parse_hitobjects(x), expected)
+        check = lambda x: self._test_hitobjects(x, expected)
         
         # extra pipes (ignored)
         check('343,300,12570,2,0,P|308:266|266:254,1,83.9999974365235,2|0|5,2:2|0:0,0:0:0:0:')
@@ -578,17 +484,24 @@ osu file format v14
     
     def test_slider_edgesets(self):
         expected = [osufile.Slider(x=343, y=300, time=12570, type=2, sound=0, curvetype='P', curvepoints=[(308, 266), (266, 254)], slides=1, length=83.9999974365235, edgesounds=[2, 0], edgesets=[(2, 2), (0, 0)], sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))]
-        check = lambda x: self.assertEqual(self.parse_hitobjects(x), expected)
+        check = lambda x: self._test_hitobjects(x, expected)
 
         # extra pipes (ignored)
         check('343,300,12570,2,0,P|308:266|266:254,1,83.9999974365235,2|0,2:2|0:0|3:4,0:0:0:0:')
         # missing pipes (should be filled with (0,0))
         check('343,300,12570,2,0,P|308:266|266:254,1,83.9999974365235,2|0,2:2,0:0:0:0:')
         # invalid arguments in pipes (error)
-        self.parse_hitobject_fail('343,300,12570,2,0,P|308:266|266:254,1,83.9999974365235,2|0,2:2|ohno,0:0:0:0:')
+        self._test_hitobject_fail('343,300,12570,2,0,P|308:266|266:254,1,83.9999974365235,2|0,2:2|ohno,0:0:0:0:')
         # extra colons (ignored)
         check('343,300,12570,2,0,P|308:266|266:254,1,83.9999974365235,2|0,2:2:4|0:0:1|3:4:0,0:0:0:0:')
         # missing colons (error)
-        self.parse_hitobject_fail('343,300,12570,2,0,P|308:266|266:254,1,83.9999974365235,2|0,2|0,0:0:0:0:')
+        self._test_hitobject_fail('343,300,12570,2,0,P|308:266|266:254,1,83.9999974365235,2|0,2|0,0:0:0:0:')
         # invalid arguments in colons (error)
-        self.parse_hitobject_fail('343,300,12570,2,0,P|308:266|266:254,1,83.9999974365235,2|0,2:2|0:ohno,0:0:0:0:')
+        self._test_hitobject_fail('343,300,12570,2,0,P|308:266|266:254,1,83.9999974365235,2|0,2:2|0:ohno,0:0:0:0:')
+    
+    def test_slider_roundtrip(self):
+        self._test_hitobject_roundtrip(cleandoc('''
+            442,316,10170,2,0,P|459:276|452:220,1,83.9999974365235,2|0,0:0|0:0,0:0:0:0:
+            56,7,11670,2,0,L|152:-2,1,83.9999974365235,0,0:0,0:0:0:0:
+            343,300,12570,2,0,P|308:266|266:254,1,83.9999974365235,2|0,2:2|0:0,0:0:0:0:
+        '''))
