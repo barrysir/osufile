@@ -15,6 +15,9 @@ class TimingPoint:
     uninherited: bool
     effects: int
 
+#-------------------------------
+#   Hit objects
+#-------------------------------
 @dataclass 
 class HitSample:
     normal_set: int
@@ -75,3 +78,33 @@ class RawHitObject:
     type: int
     sound: int
     others: list
+
+#-------------------------------
+#   Events
+#-------------------------------
+@dataclass
+class EventUnknown:
+    type : str
+    params : list
+
+@dataclass
+class EventBackground:
+    type : str
+    time : int
+    filename: str
+    xoffset : int
+    yoffset : int
+
+@dataclass
+class EventVideo:
+    type : str
+    time : int
+    filename: str
+    xoffset : int
+    yoffset : int
+
+@dataclass
+class EventBreak:
+    type : str
+    time : int
+    end : int

@@ -338,3 +338,94 @@ class HitObjects(Section):
     def write_slider_params(self, slider):
         params = [slider[0:2], *slider[2:]]
         return self.SLIDER_TYPES.write(params)
+
+
+#----------------------------------
+#    Events
+#----------------------------------
+from enum import Enum, auto
+
+class Events(Section):
+    class Type(Enum):
+        BACKGROUND = auto()
+        VIDEO = auto()
+        BREAK = auto()
+
+    def __init__(self, base):
+        self.base = base
+        osu_int = self.base.osu_int
+        osu_bool = self.base.osu_bool
+        osu_float = self.base.osu_float
+        osu_str = self.base.osu_str
+        osu_quoted_str = ParserPair(lambda x: osu_str.parse(x.strip('"')), osu_str.write)
+
+        self.HEADER_TYPES = [ParserPair(lambda x: osu_str.parse(x.strip()), osu_str.write)]
+        self.HEADER_SIZE = len(self.HEADER_TYPES)
+        self.HEADER = ptuple(self.HEADER_TYPES)
+
+        self.EVENT_LOOKUP = {
+            self.Type.BACKGROUND: (EventBackground, ptuple([osu_int, osu_quoted_str, osu_int, osu_int], optionals=[0,0])),
+            self.Type.VIDEO:      (EventVideo, ptuple([osu_int, osu_quoted_str, osu_int, osu_int], optionals=[0,0])),
+            self.Type.BREAK:      (EventBreak, ptuple([osu_int, osu_int])),
+            None:                 (EventUnknown, ParserPair(lambda raw_others: [raw_others], lambda id: id)),
+        }
+
+    def whattype(self, objtype):
+        '''
+        Figure out what event this is
+        returns one of [, None],
+        None if the object does not match any of these types
+        '''
+        LOOKUP = {
+            '0':     self.Type.BACKGROUND,
+            '1':     self.Type.VIDEO,
+            'Video': self.Type.VIDEO,
+            '2':     self.Type.BREAK,
+        }
+        return LOOKUP.get(objtype, None)
+    
+    def parse_line(self, line):
+        # split header/others
+        tokens = line.split(',')
+        raw_header,raw_others = tokens[:self.HEADER_SIZE], tokens[self.HEADER_SIZE:]
+        header = self.HEADER.parse(raw_header)
+        
+        eventtype = self.whattype(header[0])
+        constructor, pw = self.EVENT_LOOKUP[eventtype]
+        others = pw.parse(raw_others)
+        return constructor(*header, *others)
+
+    def write_line(self, obj):
+        # split data object into header/params
+        objdata = astuple_nonrecursive(obj)
+        header, others = objdata[:self.HEADER_SIZE], objdata[self.HEADER_SIZE:]
+
+        # serialize params
+        for (type, pw) in self.EVENT_LOOKUP.values():
+            if isinstance(obj, type):
+                raw_others = pw.write(others)
+                break
+        else:
+            assert False, f"unsupported object of type {obj.__class__.__name__} passed to event writer {obj!r}"
+
+        # serialize header
+        raw_header = self.HEADER.write(header)
+        # header and others might be different types (list vs. tuple)
+        # so we'll use this way of concatenating iterables
+        return ','.join([*raw_header, *raw_others])
+
+    def parse(self, section, lines):
+        def objs():
+            for line in lines:
+                line = line.strip()
+                if line == '': continue
+                if line.startswith('//'): continue
+                try:
+                    yield self.parse_line(line)
+                except Exception as ex:
+                    raise ValueError(f"failed to parse event {line!r}") from ex
+        return list(filter(lambda tp: tp is not None, objs()))
+
+    def write(self, file, section, section_data):
+        for item in section_data:
+            file.write(self.write_line(item) + '\n')

@@ -1,6 +1,6 @@
 from typing import TextIO
 from .datatypes import OsuFile
-from .sections import Metadata, TimingPoints, HitObjects, make_default_metadata_sections
+from .sections import Metadata, TimingPoints, HitObjects, Events, make_default_metadata_sections
 from .combinator import ParserPair
 from .util import spliton
 
@@ -27,6 +27,7 @@ class Parser:
             **make_default_metadata_sections(base_parser),
             'HitObjects': HitObjects(base_parser),
             'TimingPoints': TimingPoints(base_parser),
+            'Events': Events(base_parser),
         }
     
     def init_base_parser(self):
@@ -46,14 +47,7 @@ class Parser:
                 if section is None: continue        # ignore everything before the first section
                 section = section[1:-1]
                 yield section,lines
-    
-        def scrub(lines):    
-            for line in lines:
-                # line = line.strip()       # has already been stripped in sections()
-                if line == '': continue
-                if line.startswith('//'): continue
-                yield line
-
+                
         osu = OsuFile()
 
         header = next(file).strip()
@@ -62,9 +56,6 @@ class Parser:
         for section,lines in sections(file):
             if section in self.sections:
                 osu[section] = self.sections[section].parse(section, lines)
-            elif section in {'Events'}:
-                lines = scrub(lines)
-                osu[section] = [line.split(',') for line in lines]
             else:
                 osu.setdefault(section, list(lines))
         
@@ -78,9 +69,6 @@ class Parser:
 
             if section in self.sections:
                 self.sections[section].write(file, section, osu[section])
-            elif section in {'Events'}:
-                for obj in osu[section]:
-                    file.write(','.join(obj) + '\n')
             else:
                 for line in osu[section]:
                     file.write(line + '\n')
