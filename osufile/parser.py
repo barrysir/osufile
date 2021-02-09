@@ -156,8 +156,8 @@ class Parser:
         
         return osu
 
-    def write(self, file: TextIO, osu: OsuFile) -> None:            
-        file.write(osu.header + '\n')
+    def write(self, file: TextIO, osu: OsuFile) -> None:
+        file.write('osu file format v14' + '\n')    # output is written in v14 format
         for section in osu.keys():
             file.write('\n')     #newline to make the formatting look good
             file.write(f'[{section}]\n')
