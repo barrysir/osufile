@@ -355,23 +355,26 @@ class OsuFileTest(unittest.TestCase):
 
 #---------------------------------------------------------
 #   HitSample tests
-#---------------------------------------------------------
+#--------------------------------------------------------- 
+    def _get_sample_parser(self):
+        return osufile.sections.HitObjects(osufile.Parser())
+
     def test_hitsample(self):
         sample = '1:2:3:4:hi.wav'
         EXPECTED = osufile.HitSample(normal_set=1, addition_set=2, index=3, volume=4, filename='hi.wav')
-        actual = osufile.Parser().parse_hitsample(sample)
+        actual = self._get_sample_parser().parse_hitsample(sample)
         self.assertEqual(actual, EXPECTED)
     
     def test_hitsample_extra_arguments(self):
         sample = '1:2:3:4:hi.wav:adsfasdf'
         EXPECTED = osufile.HitSample(normal_set=1, addition_set=2, index=3, volume=4, filename='hi.wav')
-        actual = osufile.Parser().parse_hitsample(sample)
+        actual = self._get_sample_parser().parse_hitsample(sample)
         self.assertEqual(actual, EXPECTED)
     
     def test_hitsample_missing_arguments(self):
         sample = '1:2:3'
         with self.assertRaises(Exception):
-            osufile.Parser().parse_hitsample(sample)
+            self._get_sample_parser().parse_hitsample(sample)
 
 #---------------------------------------------------------
 #   Hold note tests
@@ -532,6 +535,6 @@ class OsuFileTest(unittest.TestCase):
             0: None,
         }
 
-        parser = osufile.Parser()
+        hitobjs = osufile.sections.HitObjects(osufile.Parser())
         for (objtype, expected) in test_cases.items():
-            self.assertEqual(parser.hitobject_whattype(objtype), expected)
+            self.assertEqual(hitobjs.hitobject_whattype(objtype), expected)
