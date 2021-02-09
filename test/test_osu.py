@@ -94,6 +94,11 @@ class OsuFileTest(unittest.TestCase):
         '''Parse .osu file held as contents of string'''
         return osufile.parse(StringIO(s))
     
+    def write_string(self, osu):
+        s = StringIO()
+        osufile.write(s, osu)
+        return s.getvalue()
+    
     def parse_hitobjects(self, hitobjs):
         '''Parse some hitobjects'''
         # create an osu file with only hitobjects and pass it into the parser
@@ -151,6 +156,31 @@ class OsuFileTest(unittest.TestCase):
         NewTag: hello
         ''')
         self.roundtrip(sample)
+    
+    def test_metadata_preserves_order(self):
+        # To check for order it does a raw string comparison which isn't great... 
+        # can't figure out how to get the order without either implementing a parser yourself
+        # or by reading the ordering from the built dict which isn't trustworthy
+        # because the parser can shuffle around the keys while building the dict
+        # I can't think of a better way to check for this
+        sample = cleandoc('''
+        osu file format v14
+
+        [General]
+        AudioFilename:audio.mp3
+        AudioLeadIn:1500
+        PreviewTime:195852
+        Countdown:0
+        SampleSet:Soft
+        StackLeniency:0.5
+        Mode:0
+        LetterboxInBreaks:0
+        WidescreenStoryboard:0
+        ''')
+        sample += '\n'  # cleandoc() strips whitespace, manually add a trailing newline
+        osu = self.parse_string(sample)
+        s = self.write_string(osu)
+        self.assertEqual(sample, s)
     
     def test_metadata_ignore_invalid_tags(self):
         sample = cleandoc('''

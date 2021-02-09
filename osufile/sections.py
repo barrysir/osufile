@@ -3,6 +3,7 @@ from .combinator import *
 from .util import *
 from .datatypes import *
 import warnings
+import collections
 
 class Section(ABC):
     @abstractmethod
@@ -29,7 +30,7 @@ class Metadata(Section):
                 except Exception as ex: 
                     raise ValueError(f"failed to parse metadata {line!r}") from ex
         valid_metadata = filter(lambda kv: kv is not None, metadata())
-        return {key:val for key,val in valid_metadata}
+        return collections.OrderedDict(valid_metadata)
     
     def write(self, file, section, section_data):
         for keyval in section_data.items():
