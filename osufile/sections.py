@@ -17,9 +17,9 @@ class Section(ABC):
 #    Metadata
 #----------------------------------
 class Metadata(Section):
-    def __init__(self, base):
+    def __init__(self, base, lookup_table):
         self.base = base
-        self.METADATA_TYPES = self.make_metadata_lookup_table()
+        self.METADATA_TYPES = lookup_table
 
     def parse(self, section, lines):
         def metadata():
@@ -49,56 +49,66 @@ class Metadata(Section):
         return f'{key}:{val}'
 
     def lookup_metadata_parser(self, section: str, key: str) -> ParserPair:
-        return self.METADATA_TYPES[section].get(key, ParserPair(str, str))
-    
-    def make_metadata_lookup_table(self):
-        osu_int = self.base.osu_int
-        osu_bool = self.base.osu_bool
-        osu_float = self.base.osu_float
-        return {
-            'General': {
-                'AudioLeadIn': osu_int,
-                'PreviewTime': osu_int,
-                'Countdown': osu_int,
-                'StackLeniency': osu_float,
-                'Mode': osu_int,
-                'LetterboxInBreaks': osu_bool,
-                'StoryFireInFront': osu_bool,
-                'EpilepsyWarning': osu_bool,
-                'CountdownOffset': osu_int,
-                'WidescreenStoryboard': osu_bool,
-                'SpecialStyle': osu_bool,
-                'UseSkinSprites': osu_bool,
-                'SamplesMatchPlaybackRate': osu_bool,
-                'AlwaysShowPlayfield': osu_bool
-            },
-            'Editor': {
-                'Bookmarks': ParserPair(
-                    lambda s: [osu_int.parse(i) for i in s.split(',')],
-                    lambda t: ','.join(map(osu_int.write,t))
-                ),
-                'DistanceSpacing': osu_float,
-                'BeatDivisor': osu_int,
-                'GridSize': osu_int,
-                'TimelineZoom': osu_float,
-            },
-            'Metadata': {
-                'BeatmapID': osu_int,
-                'BeatmapSetID': osu_int,
-                'Tags': ParserPair(
-                    lambda s: s.strip().split(' '),
-                    lambda t: ' '.join(t)
-                ),
-            },
-            'Difficulty': {
-                'HPDrainRate': osu_float,
-                'CircleSize': osu_float,
-                'OverallDifficulty': osu_float,
-                'ApproachRate': osu_float,
-                'SliderMultiplier': osu_float,
-                'SliderTickRate': osu_float,
-            },
-        }
+        return self.METADATA_TYPES.get(key, ParserPair(str, str))
+
+#----------------------------------------------------
+#    Default Metadata factories
+#----------------------------------------------------
+def make_metadata_sections(base, LOOKUP_TABLE):
+    return {section_name: Metadata(base, LOOKUP_TABLE[section_name]) for section_name in LOOKUP_TABLE.keys()}
+
+def make_default_metadata_sections(base):
+    LOOKUP_TABLE = make_default_metadata_lookup_table(base)
+    return make_metadata_sections(base, LOOKUP_TABLE)
+
+def make_default_metadata_lookup_table(base):
+    osu_int = base.osu_int
+    osu_bool = base.osu_bool
+    osu_float = base.osu_float
+    return {
+        'General': {
+            'AudioLeadIn': osu_int,
+            'PreviewTime': osu_int,
+            'Countdown': osu_int,
+            'StackLeniency': osu_float,
+            'Mode': osu_int,
+            'LetterboxInBreaks': osu_bool,
+            'StoryFireInFront': osu_bool,
+            'EpilepsyWarning': osu_bool,
+            'CountdownOffset': osu_int,
+            'WidescreenStoryboard': osu_bool,
+            'SpecialStyle': osu_bool,
+            'UseSkinSprites': osu_bool,
+            'SamplesMatchPlaybackRate': osu_bool,
+            'AlwaysShowPlayfield': osu_bool
+        },
+        'Editor': {
+            'Bookmarks': ParserPair(
+                lambda s: [osu_int.parse(i) for i in s.split(',')],
+                lambda t: ','.join(map(osu_int.write,t))
+            ),
+            'DistanceSpacing': osu_float,
+            'BeatDivisor': osu_int,
+            'GridSize': osu_int,
+            'TimelineZoom': osu_float,
+        },
+        'Metadata': {
+            'BeatmapID': osu_int,
+            'BeatmapSetID': osu_int,
+            'Tags': ParserPair(
+                lambda s: s.strip().split(' '),
+                lambda t: ' '.join(t)
+            ),
+        },
+        'Difficulty': {
+            'HPDrainRate': osu_float,
+            'CircleSize': osu_float,
+            'OverallDifficulty': osu_float,
+            'ApproachRate': osu_float,
+            'SliderMultiplier': osu_float,
+            'SliderTickRate': osu_float,
+        },
+    }
 
 #----------------------------------
 #    TimingPoints

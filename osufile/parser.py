@@ -1,12 +1,11 @@
 from typing import TextIO
 from .datatypes import OsuFile
-from .sections import Metadata, TimingPoints, HitObjects
+from .sections import Metadata, TimingPoints, HitObjects, make_default_metadata_sections
 from .combinator import ParserPair
 from .util import spliton
 
-# --- Parser ---
 class Parser:
-    # simple parsers
+    # base parsers
     def parse_bool(self, x): return bool(int(x))
     def write_bool(self, x): return str(int(x))
     def parse_int(self, x): return int(round(float(x)))
@@ -20,23 +19,21 @@ class Parser:
         # (need a reference to 'self')
         # could use metaclasses to generate the lookup table but it makes things complicated
 
-        # base pairs which the lookup tables use
+        # Place the base parsing functions in the main parser for now
+        self.init_base_parser()
+        base_parser = self
+
+        self.sections = {
+            **make_default_metadata_sections(base_parser),
+            'HitObjects': HitObjects(base_parser),
+            'TimingPoints': TimingPoints(base_parser),
+        }
+    
+    def init_base_parser(self):
         self.osu_int = ParserPair(self.parse_int, self.write_int)
         self.osu_float = ParserPair(self.parse_float, self.write_float)
         self.osu_bool = ParserPair(self.parse_bool, self.write_bool)
         self.osu_str = ParserPair(str,str)
-        
-        metadata = Metadata(self)
-        hitobjs = HitObjects(self)
-        tps = TimingPoints(self)
-        self.sections = {
-            'General': metadata,
-            'Editor': metadata,
-            'Metadata': metadata,
-            'Difficulty': metadata,
-            'HitObjects': hitobjs,
-            'TimingPoints': tps,
-        }
 
     def parse(self, file: TextIO) -> OsuFile:
         """
