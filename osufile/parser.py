@@ -268,6 +268,17 @@ class Parser:
     def default_hitsample(self):
         return HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename='')
     
+    def hitobject_whattype(self, objtype):
+        '''
+        Figure out what hitobject this is from the type bitmask (in case multiple bits are set)
+        returns one of [self.HITTYPE_CIRCLE, self.HITTYPE_SLIDER, self.HITTYPE_SPINNER, self.HITTYPE_HOLD, None],
+        None if the object does not match any of these types
+        '''
+        ordering = [self.HITTYPE_CIRCLE, self.HITTYPE_SLIDER, self.HITTYPE_SPINNER, self.HITTYPE_HOLD]
+        for o in ordering:
+            if objtype & o: return o
+        return None
+    
     def parse_hitobject_section(self, section, lines):
         def objs():
             for line in lines:
@@ -288,21 +299,16 @@ class Parser:
 
         # parse header, and parse params using type from header
         header = self.HITOBJECT_HEADER.parse(raw_header)
-        objtype = header[3]
-        if objtype & self.HITTYPE_CIRCLE:
-            others = self.parse_hitcircle_params(raw_others)
-            return HitCircle(*header, *others)
-        elif objtype & self.HITTYPE_HOLD:
-            others = self.parse_hold_params(raw_others)
-            return Hold(*header, *others)
-        elif objtype & self.HITTYPE_SPINNER:
-            others = self.parse_spinner_params(raw_others)
-            return Spinner(*header, *others)
-        elif objtype & self.HITTYPE_SLIDER:
-            others = self.parse_slider_params(raw_others)
-            return Slider(*header, *others)
-        else:
-            return RawHitObject(*header, raw_others)
+        whatobj = self.hitobject_whattype(header[3])
+        constructor, parser = {
+            self.HITTYPE_CIRCLE:  (HitCircle, self.parse_hitcircle_params),
+            self.HITTYPE_SLIDER:  (Slider, self.parse_slider_params),
+            self.HITTYPE_SPINNER: (Spinner, self.parse_spinner_params),
+            self.HITTYPE_HOLD:    (Hold, self.parse_hold_params),
+            None:                 (RawHitObject, lambda raw_others: [raw_others])   # RawHitObject params = one argument, containing all parameters
+        }[whatobj]
+        others = parser(raw_others)
+        return constructor(*header, *others)
 
     def write_hitobject(self, obj):
         # split data object into header/params
@@ -310,16 +316,19 @@ class Parser:
         header, others = objdata[:self.HITOBJECT_HEADER_SIZE], objdata[self.HITOBJECT_HEADER_SIZE:]
 
         # serialize params
-        if isinstance(obj, HitCircle):
-            raw_others = self.write_hitcircle_params(others)
-        elif isinstance(obj, Hold):
-            raw_others = self.write_hold_params(others)
-        elif isinstance(obj, Spinner):
-            raw_others = self.write_spinner_params(others)
-        elif isinstance(obj, Slider):
-            raw_others = self.write_slider_params(others)
-        elif isinstance(obj, RawHitObject):
-            raw_others = others
+        lookup_table = [
+            (HitCircle, self.write_hitcircle_params),
+            (Spinner, self.write_spinner_params),
+            (Slider, self.write_slider_params),
+            (Hold, self.write_hold_params),
+            (RawHitObject, lambda id: id)
+        ]
+        for (type, writer) in lookup_table:
+            if isinstance(obj, type):
+                raw_others = writer(others)
+                break
+        else:
+            assert False, f"unsupported obj of type {obj.__class__.__name__} passed to write_hitobject {obj!r}"
 
         # serialize header
         raw_header = self.HITOBJECT_HEADER.write(header)

@@ -505,3 +505,33 @@ class OsuFileTest(unittest.TestCase):
             56,7,11670,2,0,L|152:-2,1,83.9999974365235,0,0:0,0:0:0:0:
             343,300,12570,2,0,P|308:266|266:254,1,83.9999974365235,2|0,2:2|0:0,0:0:0:0:
         '''))
+
+#---------------------------------------------------------
+#   Bit precedence
+#---------------------------------------------------------   
+    def test_hitobject_precedence(self):
+        CIRCLE    = 0b00000001
+        SLIDER    = 0b00000010
+        SPINNER   = 0b00001000
+        HOLD      = 0b10000000
+
+        test_cases = {
+            # the obvious cases
+            CIRCLE: CIRCLE,
+            SLIDER: SLIDER,
+            SPINNER: SPINNER,
+            HOLD: HOLD,
+            # mixups
+            CIRCLE|SLIDER: CIRCLE,
+            CIRCLE|SPINNER: CIRCLE,
+            CIRCLE|HOLD: CIRCLE,
+            SLIDER|SPINNER: SLIDER,
+            SLIDER|HOLD: SLIDER,
+            SPINNER|HOLD: SPINNER,
+            # none
+            0: None,
+        }
+
+        parser = osufile.Parser()
+        for (objtype, expected) in test_cases.items():
+            self.assertEqual(parser.hitobject_whattype(objtype), expected)
