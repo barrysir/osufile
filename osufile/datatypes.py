@@ -59,12 +59,12 @@ class Slider:
     time: int
     type: int
     sound: int
-    curveType : str
-    curvePoints : list
+    curvetype : str
+    curvepoints : list
     slides : int
     length : float
-    edgeSounds : list
-    edgeSets : list
+    edgesounds : list
+    edgesets : list
     sample: HitSample
 
 @dataclass

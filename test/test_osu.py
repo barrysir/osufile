@@ -528,11 +528,11 @@ osu file format v14
     def test_slider(self):
         self.assertEqual(
             self.parse_hitobjects('442,316,10170,2,0,P|459:276|452:220,1,83.9999974365235,2|0,0:0|0:0,0:0:0:0:'),
-            [osufile.Slider(x=442, y=316, time=10170, type=2, sound=0, curveType='P', curvePoints=[(459, 276), (452, 220)], slides=1, length=83.9999974365235, edgeSounds=[2, 0], edgeSets=[(0, 0), (0, 0)], sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))]
+            [osufile.Slider(x=442, y=316, time=10170, type=2, sound=0, curvetype='P', curvepoints=[(459, 276), (452, 220)], slides=1, length=83.9999974365235, edgesounds=[2, 0], edgesets=[(0, 0), (0, 0)], sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))]
         )
         self.assertEqual(
             self.parse_hitobjects('56,7,11670,2,0,L|152:-2,1,83.9999974365235,0,0:0,0:0:0:0:'),
-            [osufile.Slider(x=56, y=7, time=11670, type=2, sound=0, curveType='L', curvePoints=[(152, -2)], slides=1, length=83.9999974365235, edgeSounds=[0], edgeSets=[(0, 0)], sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))]
+            [osufile.Slider(x=56, y=7, time=11670, type=2, sound=0, curvetype='L', curvepoints=[(152, -2)], slides=1, length=83.9999974365235, edgesounds=[0], edgesets=[(0, 0)], sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))]
         )
 
     def test_slider_optional_arguments(self):
@@ -544,7 +544,7 @@ osu file format v14
             '56,7,11670,2,0,L|152:-2,1'
         ]
         EXPECTED = [
-            osufile.Slider(x=56, y=7, time=11670, type=2, sound=0, curveType='L', curvePoints=[(152, -2)], slides=1, length=83.9999974365235, edgeSounds=[0], edgeSets=[(0, 0)], sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))
+            osufile.Slider(x=56, y=7, time=11670, type=2, sound=0, curvetype='L', curvepoints=[(152, -2)], slides=1, length=83.9999974365235, edgesounds=[0], edgesets=[(0, 0)], sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))
         for i in range(len(sliders))]
 
         # the parser doesn't recalculate omitted lengths, it sets the lengths to 0,
@@ -562,11 +562,11 @@ osu file format v14
     def test_slider_too_many_arguments(self):
         self.assertEqual(
             self.parse_hitobjects('56,7,11670,2,0,L|152:-2,1,83.9999974365235,0,0:0,0:0:0:0:,hi'),
-            [osufile.Slider(x=56, y=7, time=11670, type=2, sound=0, curveType='L', curvePoints=[(152, -2)], slides=1, length=83.9999974365235, edgeSounds=[0], edgeSets=[(0, 0)], sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))]
+            [osufile.Slider(x=56, y=7, time=11670, type=2, sound=0, curvetype='L', curvepoints=[(152, -2)], slides=1, length=83.9999974365235, edgesounds=[0], edgesets=[(0, 0)], sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))]
         )
     
     def test_slider_edgesounds(self):
-        expected = [osufile.Slider(x=343, y=300, time=12570, type=2, sound=0, curveType='P', curvePoints=[(308, 266), (266, 254)], slides=1, length=83.9999974365235, edgeSounds=[2, 0], edgeSets=[(2, 2), (0, 0)], sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))]
+        expected = [osufile.Slider(x=343, y=300, time=12570, type=2, sound=0, curvetype='P', curvepoints=[(308, 266), (266, 254)], slides=1, length=83.9999974365235, edgesounds=[2, 0], edgesets=[(2, 2), (0, 0)], sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))]
         check = lambda x: self.assertEqual(self.parse_hitobjects(x), expected)
         
         # extra pipes (ignored)
@@ -577,7 +577,7 @@ osu file format v14
         check('343,300,12570,2,0,P|308:266|266:254,1,83.9999974365235,2|asdf,2:2|0:0,0:0:0:0:')
     
     def test_slider_edgesets(self):
-        expected = [osufile.Slider(x=343, y=300, time=12570, type=2, sound=0, curveType='P', curvePoints=[(308, 266), (266, 254)], slides=1, length=83.9999974365235, edgeSounds=[2, 0], edgeSets=[(2, 2), (0, 0)], sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))]
+        expected = [osufile.Slider(x=343, y=300, time=12570, type=2, sound=0, curvetype='P', curvepoints=[(308, 266), (266, 254)], slides=1, length=83.9999974365235, edgesounds=[2, 0], edgesets=[(2, 2), (0, 0)], sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))]
         check = lambda x: self.assertEqual(self.parse_hitobjects(x), expected)
 
         # extra pipes (ignored)
