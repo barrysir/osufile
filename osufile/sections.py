@@ -230,6 +230,8 @@ class HitObjects(Section):
     def parse(self, section, lines):
         def objs():
             for line in lines:
+                line = line.strip()
+                if line == '': continue
                 try:
                     yield self.parse_hitobject(line)
                 except Exception as ex:

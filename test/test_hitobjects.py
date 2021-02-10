@@ -11,6 +11,16 @@ class HitObjectsSectionTest(SectionTest):
         parser = osufile.sections.HitObjects(base)
         super().setUp('HitObjects', parser)
 
+    def test_empty_line(self):
+        self._test_section(cleandoc('''
+            200,100,10000,1,0,0:0:0:0:
+            
+            300,100,15000,1,0,0:0:0:0:
+        '''), [
+            osufile.HitCircle(x=200, y=100, time=10000, type=1, sound=0, sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename='')),
+            osufile.HitCircle(x=300, y=100, time=15000, type=1, sound=0, sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))
+        ])
+
 #---------------------------------------------------------
 #   HitSample tests
 #--------------------------------------------------------- 
