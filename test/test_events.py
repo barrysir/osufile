@@ -135,3 +135,23 @@ class EventSectionTest(unittest.TestCase):
         for name,data in test_case_crash.items():
             with self.subTest(case=name):
                 self._test_event_fail(data)
+
+    def test_breaks(self):
+        test_cases = {
+            'normal': '2,0,1000',
+            'extra arguments': '2,0,1000,extra_argument',
+        }
+        EXPECTED = [osufile.EventBreak(type='2', time=0, end=1000)]
+        for name,data in test_cases.items():
+            with self.subTest(case=name):
+                self._test_event(data, EXPECTED)
+                self.roundtrip(data)
+
+        test_case_crash = {
+            'missing arguments': '2,0',
+            'bad starttime': '2,bad,1000',
+            'bad endtime': '2,0,bad',
+        }
+        for name,data in test_case_crash.items():
+            with self.subTest(case=name):
+                self._test_event_fail(data)
