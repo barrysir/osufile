@@ -57,7 +57,7 @@ class Parser:
             if section in self.sections:
                 osu[section] = self.sections[section].parse(section, lines)
             else:
-                osu.setdefault(section, list(lines))
+                osu[section] = list(lines)
         
         return osu
 
