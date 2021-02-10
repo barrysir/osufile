@@ -21,6 +21,14 @@ class HitObjectsSectionTest(SectionTest):
             osufile.HitCircle(x=300, y=100, time=15000, type=1, sound=0, sample=osufile.HitSample(normal_set=0, addition_set=0, index=0, volume=0, filename=''))
         ])
 
+    def test_unknown_hitobject(self):
+        # has type 0, should be written as a RawHitObject
+        sample = '200,100,10000,0,0,not,a,hitobject'
+        self._test_section(sample, [
+            osufile.RawHitObject(x=200, y=100, time=10000, type=0, sound=0, others=['not', 'a', 'hitobject'])]
+        )
+        self._test_roundtrip(sample)
+
 #---------------------------------------------------------
 #   HitSample tests
 #--------------------------------------------------------- 

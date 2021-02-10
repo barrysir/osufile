@@ -33,6 +33,7 @@ class EventSectionTest(SectionTest):
     
     def test_unknown(self):
         self._test_section('a', [osufile.EventUnknown(type='a', params=[])])
+        self._test_roundtrip('a')
 
     def test_background(self):
         test_cases = {

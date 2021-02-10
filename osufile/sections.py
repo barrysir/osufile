@@ -271,7 +271,7 @@ class HitObjects(Section):
             (Spinner, self.write_spinner_params),
             (Slider, self.write_slider_params),
             (Hold, self.write_hold_params),
-            (RawHitObject, lambda id: id)
+            (RawHitObject, lambda id: id[0])
         ]
         for (type, writer) in lookup_table:
             if isinstance(obj, type):
@@ -369,7 +369,7 @@ class Events(Section):
             self.Type.BACKGROUND: (EventBackground, ptuple([osu_int, osu_quoted_str, osu_int, osu_int], optionals=[0,0])),
             self.Type.VIDEO:      (EventVideo, ptuple([osu_int, osu_quoted_str, osu_int, osu_int], optionals=[0,0])),
             self.Type.BREAK:      (EventBreak, ptuple([osu_int, osu_int])),
-            None:                 (EventUnknown, ParserPair(lambda raw_others: [raw_others], lambda id: id)),
+            None:                 (EventUnknown, ParserPair(lambda raw_others: [raw_others], lambda id: id[0])),
         }
 
     def whattype(self, objtype):
