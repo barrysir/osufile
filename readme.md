@@ -1,6 +1,6 @@
 # osufile
 
-Relatively compact and hackable .osu parser. Supports reading and writing. Default implementation tries to match osu!'s parsing behaviour, but you can override parts of the parser to disable or add functionality.
+Modular hackable .osu parser. Supports reading and writing. Default implementation tries to match osu!'s parsing behaviour, but you can override parts of the parser to disable or add functionality.
 
 ## Requirements
 
@@ -23,7 +23,7 @@ osu['Metadata']['Version'] += ' AR9.5'
 osufile.write(r'cYsmix feat. Emmy - Tear Rain (jonathanlfj) [Insane AR9.5].osu', osu)
 ```
 
-Hacking the parser:
+Creating and using custom parsers (design still WIP, subject to change):
 
 ```python
 import osufile
@@ -36,6 +36,27 @@ class MyParser(osufile.Parser):
 parser = MyParser()
 osu = osufile.parse('infile.osu', parser=parser)
 osufile.write('outfile.osu', osu, parser=parser)
+```
+
+```python
+import osufile
+
+class NumbersSection(osufile.Section):
+    def parse(self, section_name, lines):
+        return [int(x) for x in lines]
+
+    def write(self, file, section_name, data):
+        for x in data:
+            file.write(str(x) + '\n')
+
+class ParserWithNumbers(osufile.Parser):
+    def __init__(self):
+        super().__init__()
+        self.sections['Numbers'] = NumbersSection()
+
+parser_with_numbers = ParserWithNumbers()
+osu = osufile.parse('infile_with_numbers.osu', parser=parser_with_numbers)
+osufile.write('outfile_with_numbers.osu', osu, parser=parser_with_numbers)
 ```
 
 ## Running tests
