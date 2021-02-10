@@ -63,24 +63,75 @@ class EventSectionTest(unittest.TestCase):
     def test_background(self):
         test_cases = {
             'normal': '0,0,12.jpg,0,0',
-            'quoted background': '0,0,"12.jpg",0,0',
+            'quoted': '0,0,"12.jpg",0,0',
             'extra arguments': '0,0,12.jpg,0,0,extra_argument',
             'missing yoffset': '0,0,12.jpg,0',
             'missing xoffset': '0,0,12.jpg',
         }
         EXPECTED = [osufile.EventBackground(type='0', time=0, filename='12.jpg', xoffset=0, yoffset=0)]
-
-        test_case_crash = {
-            'bad xoffset': '0,0,12.jpg,bad,0',
-            'bad yoffset': '0,0,12.jpg,0,bad',
-            'no background': '0,0',
-        }
-
         for name,data in test_cases.items():
             with self.subTest(case=name):
                 self._test_event(data, EXPECTED)
                 self.roundtrip(data)
+            
+        # spaces should not be stripped
+        test_cases_spaces = {
+            'spaces': ('  12.jpg  ', '  12.jpg  '),
+            'spaces outside quotes': (' "12.jpg" ', ' "12.jpg" '),
+            'spaces within quotes': ('"  12.jpg  "', '  12.jpg  '),     # quotes are stripped
+        }
+        for name,(input,output) in test_cases_spaces.items():
+            with self.subTest(case=name):
+                data = f'0,0,{input},0,0'
+                EXPECTED2 = [osufile.EventBackground(type='0', time=0, filename=output, xoffset=0, yoffset=0)]
+                self._test_event(data, EXPECTED2)
+                self.roundtrip(data)
+
+        test_case_crash = {
+            'bad xoffset': '0,0,12.jpg,bad,0',
+            'bad yoffset': '0,0,12.jpg,0,bad',
+            'no filepath': '0,0',
+        }
+        for name,data in test_case_crash.items():
+            with self.subTest(case=name):
+                self._test_event_fail(data)
+
+    def test_video(self):
+        test_cases = {
+            'normal': '1,0,video.mp4,0,0',
+            'quoted': '1,0,"video.mp4",0,0',
+            'extra arguments': '1,0,video.mp4,0,0,extra_argument',
+            'missing yoffset': '1,0,video.mp4,0',
+            'missing xoffset': '1,0,video.mp4',
+        }
+        EXPECTED = [osufile.EventVideo(type='1', time=0, filename='video.mp4', xoffset=0, yoffset=0)]
+            
+        for name,data in test_cases.items():
+            with self.subTest(case=name):
+                self._test_event(data, EXPECTED)
+                self.roundtrip(data)
+                
+        with self.subTest(case='normal_video'):
+            self._test_event('Video,0,video.mp4,0,0', [osufile.EventVideo(type='Video', time=0, filename='video.mp4', xoffset=0, yoffset=0)])
+
+        # spaces should not be stripped
+        test_cases_spaces = {
+            'spaces': ('  12.jpg  ', '  12.jpg  '),
+            'spaces outside quotes': (' "12.jpg" ', ' "12.jpg" '),
+            'spaces within quotes': ('"  12.jpg  "', '  12.jpg  '),     # quotes are stripped
+        }
+        for name,(input,output) in test_cases_spaces.items():
+            with self.subTest(case=name):
+                data = f'1,0,{input},0,0'
+                EXPECTED2 = [osufile.EventVideo(type='1', time=0, filename=output, xoffset=0, yoffset=0)]
+                self._test_event(data, EXPECTED2)
+                self.roundtrip(data)   
         
+        test_case_crash = {
+            'bad xoffset': '1,0,video.mp4,bad,0',
+            'bad yoffset': '1,0,video.mp4,0,bad',
+            'no filepath': '1,0',
+        }
         for name,data in test_case_crash.items():
             with self.subTest(case=name):
                 self._test_event_fail(data)
