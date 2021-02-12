@@ -4,6 +4,7 @@ from .util import *
 from .datatypes import *
 import warnings
 import collections
+from enum import Enum, auto
 
 class Section(ABC):
     @abstractmethod
@@ -341,12 +342,9 @@ class HitObjects(Section):
         params = [slider[0:2], *slider[2:]]
         return self.SLIDER_TYPES.write(params)
 
-
 #----------------------------------
 #    Events
 #----------------------------------
-from enum import Enum, auto
-
 class Events(Section):
     class Type(Enum):
         BACKGROUND = auto()
@@ -431,3 +429,50 @@ class Events(Section):
     def write(self, file, section, section_data):
         for item in section_data:
             file.write(self.write_line(item) + '\n')
+
+#----------------------------------
+#    Colours
+#----------------------------------
+# class Colours(Metadata):
+#     def __init__(self, base):
+#         # pass in a dummy lookup table -- we're overriding lookup_metadata_parser ourselves
+#         super().__init__(base, {})
+#         self.colour = ptuple_split(',', [base.osu_int]*3)
+    
+#     def lookup_metadata_parser(self, section: str, key: str) -> ParserPair:
+#         return self.colour
+    
+# code is very similar to Metadata but with subtle differences
+class Colours(Section):
+    def __init__(self, base):
+        self.base = base
+        self.COLOUR = ptuple_split(',', [base.osu_int]*3)
+    
+    def parse(self, section, lines):
+        def colours():
+            for line in lines:
+                # whitespace is NOT entirely stripped
+                # blank lines are ignored
+                if line.isspace(): continue
+                if line == '': continue
+                try:
+                    yield self.parse_colour(line)
+                except Exception as ex: 
+                    raise ValueError(f"failed to parse colour {line!r}") from ex
+        valid_colours = filter(lambda kv: kv is not None, colours())
+        return collections.OrderedDict(valid_colours)
+    
+    def write(self, file, section, section_data):
+        for keyval in section_data.items():
+            file.write(f'{self.write_colour(keyval)}\n')
+    
+    def parse_colour(self, line: str) -> (str, any):
+        key,sep,val = line.partition(':')
+        key = key.rstrip()      # note: rstrip
+        val = self.COLOUR.parse(val.strip())
+        return (key,val)
+    
+    def write_colour(self, keyval: (str, any)) -> str:
+        key,val = keyval
+        val = self.COLOUR.write(val)
+        return f'{key} : {val}' # note: space surrounding the colon for formatting consistency

@@ -1,6 +1,6 @@
 from typing import TextIO
 from .datatypes import OsuFile
-from .sections import Metadata, TimingPoints, HitObjects, Events, make_default_metadata_sections
+from .sections import Metadata, TimingPoints, HitObjects, Events, Colours, make_default_metadata_sections
 from .combinator import ParserPair
 from .util import spliton
 
@@ -28,6 +28,7 @@ class Parser:
             'HitObjects': HitObjects(base_parser),
             'TimingPoints': TimingPoints(base_parser),
             'Events': Events(base_parser),
+            'Colours': Colours(base_parser),
         }
     
     def init_base_parser(self):
