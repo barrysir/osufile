@@ -36,8 +36,18 @@ class Parser:
         self.osu_float = ParserPair(self.parse_float, self.write_float)
         self.osu_bool = ParserPair(self.parse_bool, self.write_bool)
         self.osu_str = ParserPair(str,str)
+    
+    def parse(self, obj):
+        'Helper function to call osufile.parse using this parser'
+        from .base import parse
+        return parse(obj, parser=self)
+    
+    def write(self, obj, osu):
+        'Helper function to call osufile.write using this parser'
+        from .base import write
+        return write(obj, osu, parser=self)
 
-    def parse(self, file: TextIO) -> OsuFile:
+    def _parse(self, file: TextIO) -> OsuFile:
         """
         Parse a .osu file from a file object
         Returns an OsuFile
@@ -62,7 +72,7 @@ class Parser:
         
         return osu
 
-    def write(self, file: TextIO, osu: OsuFile) -> None:
+    def _write(self, file: TextIO, osu: OsuFile) -> None:
         file.write('osu file format v14' + '\n')    # output is written in v14 format
         for section in osu.keys():
             file.write('\n')     #newline to make the formatting look good

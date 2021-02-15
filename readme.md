@@ -36,6 +36,10 @@ class MyParser(osufile.Parser):
 parser = MyParser()
 osu = osufile.parse('infile.osu', parser=parser)
 osufile.write('outfile.osu', osu, parser=parser)
+
+# alternate syntax
+osu = parser.parse('infile.osu')
+parser.write('outfile.osu', osu)
 ```
 
 ```python

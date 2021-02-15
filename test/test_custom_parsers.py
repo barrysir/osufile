@@ -25,6 +25,21 @@ class CustomParsersTest(unittest.TestCase):
         out.seek(0)
         second_pass = osufile.parse(out, parser=self.my_parser)
         self.assertEqual(first_pass, second_pass)
+    
+    def test_alternative_syntax(self):
+        inp = StringIO(SAMPLE_FILE)
+        first_pass = self.my_parser.parse(inp)
+
+        # check that floats were parsed into Decimal
+        self.assertTrue(isinstance(first_pass['General']['StackLeniency'], Decimal))
+
+        # round trip
+        out = StringIO()
+        self.my_parser.write(out, first_pass)
+        out.seek(0)
+        second_pass = self.my_parser.parse(out)
+        self.assertEqual(first_pass, second_pass)
+
 
 SAMPLE_FILE = '''
 osu file format v14
