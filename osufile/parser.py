@@ -66,7 +66,10 @@ class Parser:
 
         for section,lines in sections(file):
             if section in self.sections:
-                osu[section] = self.sections[section].parse(section, lines)
+                try:
+                    osu[section] = self.sections[section].parse(section, lines)
+                except Exception as ex:
+                    raise ValueError(f"Error parsing section {section!r}") from ex
             else:
                 osu[section] = list(lines)
         
@@ -79,7 +82,10 @@ class Parser:
             file.write(f'[{section}]\n')
 
             if section in self.sections:
-                self.sections[section].write(file, section, osu[section])
+                try:
+                    self.sections[section].write(file, section, osu[section])
+                except Exception as ex:
+                    raise ValueError(f"Error writing section {section!r}") from ex
             else:
                 for line in osu[section]:
                     file.write(line + '\n')
