@@ -2,7 +2,7 @@ from typing import TextIO
 from .datatypes import OsuFile
 from .sections import Metadata, TimingPoints, HitObjects, Events, Colours, make_default_metadata_sections
 from .combinator import ParserPair
-from .util import spliton
+from .utils import spliton
 
 class Parser:
     # base parsers

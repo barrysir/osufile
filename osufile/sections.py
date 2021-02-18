@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from .combinator import *
-from .util import *
+from .utils import *
 from .datatypes import *
 import warnings
 import collections
@@ -442,7 +442,7 @@ class Events(Section):
 #     def lookup_metadata_parser(self, section: str, key: str) -> ParserPair:
 #         return self.colour
     
-# code is very similar to Metadata but with subtle differences
+# Colours is very similar to Metadata but with subtle differences
 class Colours(Section):
     def __init__(self, base):
         self.base = base
